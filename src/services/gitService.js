@@ -338,6 +338,41 @@ export async function revertLastCommit(directoryPath = '.', noEdit = false) {
     throw error;
   }
 }
+/**
+ * Lists local and/or remote branches.
+ * @param {string} directoryPath - The path to the Git repository.
+ * @param {object} options - Options for listing branches (e.g., ['-a'] for all).
+ * @returns {Promise<import('simple-git').BranchSummary>} Branch summary.
+ */
+export async function listBranches(directoryPath = '.', options = []) {
+  const git = simpleGit(directoryPath);
+  try {
+    const branchSummary = await git.branch(options);
+    logger.debug('Fetched branches.', { branches: branchSummary.all, service: serviceName, path: directoryPath });
+    return branchSummary;
+  } catch (error) {
+    logger.error('Error listing branches:', { message: error.message, stack: error.stack, service: serviceName });
+    throw error;
+  }
+}
+
+/**
+ * Retrieves the commit log.
+ * @param {string} directoryPath - The path to the Git repository.
+ * @param {object} options - Options for the log (e.g., { maxCount: 5, file: 'path/to/file' }).
+ * @returns {Promise<import('simple-git').LogResult>} Log result.
+ */
+export async function getLog(directoryPath = '.', options = {}) {
+  const git = simpleGit(directoryPath);
+  try {
+    const log = await git.log(options);
+    logger.debug('Fetched commit log.', { count: log.total, service: serviceName, path: directoryPath });
+    return log;
+  } catch (error) {
+    logger.error('Error fetching log:', { message: error.message, stack: error.stack, service: serviceName });
+    throw error;
+  }
+}
 // TODO: Add more functions as needed:
 // - Fetch
 // - Clone
