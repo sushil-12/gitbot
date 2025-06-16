@@ -319,6 +319,25 @@ export async function rebaseBranch(baseBranch, directoryPath = '.', options = []
     }
 }
 
+/**
+ * Reverts the last commit.
+ * @param {string} directoryPath - The path to the Git repository.
+ * @param {boolean} noEdit - If true, does not open an editor for the revert commit message.
+ * @returns {Promise<string>} A message indicating success or failure.
+ */
+export async function revertLastCommit(directoryPath = '.', noEdit = false) {
+  const git = simpleGit(directoryPath);
+  try {
+    const options = noEdit ? ['--no-edit', 'HEAD'] : ['HEAD'];
+    await git.revert(options);
+    const message = `Successfully reverted the last commit.${noEdit ? ' (no edit)' : ''}`;
+    logger.info(message, { service: serviceName, path: directoryPath });
+    return message;
+  } catch (error) {
+    logger.error('Error reverting last commit:', { message: error.message, stack: error.stack, service: serviceName, path: directoryPath });
+    throw error;
+  }
+}
 // TODO: Add more functions as needed:
 // - Fetch
 // - Clone

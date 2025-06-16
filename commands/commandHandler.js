@@ -224,8 +224,56 @@ export async function handleNlpCommand(query) {
         await handleGitCommand(['init'], '.'); // Assuming current directory
         break;
       case 'git_add':
-        const files = parsed.entities?.files === 'all' || !parsed.entities?.files ? '.' : parsed.entities.files;
-        await handleGitCommand(['add', files], '.');
+        const filesEntity = parsed.entities?.files;
+        if (filesEntity && filesEntity !== 'all' && filesEntity !== 'some' && filesEntity !== 'changes') {
+          // Specific files mentioned, add them directly
+          await handleGitCommand(['add', filesEntity], '.');
+        } else if (filesEntity === 'all') {
+          // Add all files
+          await handleGitCommand(['add', '.'], '.');
+        } else {
+          // No specific files, or "some"/"changes" -> interactive mode
+          try {
+            const status = await gitService.getStatus('.');
+            const unStagedFiles = [
+              ...status.not_added.map(f => ({ name: `${f} (Untracked)`, value: f, short: f })),
+              ...status.modified.map(f => ({ name: `${f} (Modified)`, value: f, short: f })),
+              ...status.deleted.map(f => ({ name: `${f} (Deleted)`, value: f, short: f })),
+              // Potentially add renamed, conflicted etc. if detailed status is parsed
+            ];
+
+            if (unStagedFiles.length === 0) {
+              console.log("No changes to add. Working directory clean.");
+              break;
+            }
+
+            const { filesToAdd } = await inquirer.prompt([
+              {
+                type: 'checkbox',
+                name: 'filesToAdd',
+                message: 'Select files to stage:',
+                choices: unStagedFiles,
+                pageSize: 10,
+                validate: (answer) => {
+                  if (answer.length < 1) {
+                    return 'You must choose at least one file.';
+                  }
+                  return true;
+                }
+              }
+            ]);
+
+            if (filesToAdd && filesToAdd.length > 0) {
+              await gitService.addFiles(filesToAdd, '.');
+              console.log(`Successfully staged: ${filesToAdd.join(', ')}`);
+            } else {
+              console.log("No files selected to stage.");
+            }
+          } catch (error) {
+            console.error(`Error during interactive add: ${error.message}`);
+            logger.error('Failed to interactively add files:', { message: error.message, stack: error.stack, service: serviceName });
+          }
+        }
         break;
       case 'git_commit':
         const msg = parsed.entities?.commit_message;
@@ -592,6 +640,16 @@ export async function handleNlpCommand(query) {
         }
         break;
       // TODO: Implement handlers for other intents (pull_changes, create_branch, create_pr, git_status etc.)
+      case 'git_revert_last_commit':
+        const noEditRevert = parsed.entities?.no_edit === true;
+        try {
+          const message = await gitService.revertLastCommit('.', noEditRevert);
+          console.log(message);
+        } catch (error) {
+          console.error(`Error reverting last commit: ${error.message}`);
+          logger.error('Failed to revert last commit via NLP:', { message: error.message, stack: error.stack, service: serviceName });
+        }
+        break;
       default:
         console.log(`Intent '${parsed.intent}' is recognized but not yet implemented.`);
         logger.info(`NLP intent '${parsed.intent}' not yet implemented.`, { service: serviceName });
