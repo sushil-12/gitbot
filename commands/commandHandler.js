@@ -857,6 +857,28 @@ async function handleMergeRequest(sourceBranch, targetBranch = 'main') {
     // 7. Check if source branch has been pushed to remote
     const remoteBranches = await gitService.listBranches('.', ['-r']);
     const sourceBranchRemote = `remotes/origin/${sourceBranch}`;
+    const targetBranchRemote = `remotes/origin/${targetBranch}`;
+
+    // Check if target branch exists on remote
+    if (!remoteBranches.all.includes(targetBranchRemote)) {
+      console.log(`\nTarget branch '${targetBranch}' does not exist on remote.`);
+      const createTargetBranch = await prompter.askYesNo(`Would you like to create and push the ${targetBranch} branch to remote?`, true);
+      if (createTargetBranch) {
+        try {
+          // Create and push the target branch
+          await gitService.createAndCheckoutBranch(targetBranch, '.');
+          await gitService.pushChanges('origin', targetBranch, '.', true);
+          console.log(`Successfully created and pushed branch '${targetBranch}' to remote.`);
+        } catch (error) {
+          throw new Error(`Failed to create target branch: ${error.message}`);
+        }
+      } else {
+        console.log(`Please create and push the ${targetBranch} branch to remote before creating a pull request.`);
+        return;
+      }
+    }
+
+    // Check if source branch exists on remote
     if (!remoteBranches.all.includes(sourceBranchRemote)) {
       console.log(`\nBranch '${sourceBranch}' has not been pushed to remote yet.`);
       const shouldPush = await prompter.askYesNo("Would you like to push this branch to remote now?", true);
