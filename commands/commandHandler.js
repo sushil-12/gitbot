@@ -849,8 +849,11 @@ async function handleMergeRequest(sourceBranch, targetBranch = 'main') {
       });
       
       const { url } = await response.json();
-      console.log("\nOpening diff viewer in your browser...");
-      await open(`http://localhost:3000${url}`);
+      const fullUrl = `http://localhost:3000${url}`;
+      
+      console.log("\nPlease review the changes at this URL:");
+      console.log(chalk.blue(fullUrl));
+      console.log("\nYou can copy and paste this URL into your browser.");
       
       const proceed = await prompter.askYesNo("\nDo you want to proceed with creating the merge request?", true);
       if (!proceed) {
@@ -858,12 +861,33 @@ async function handleMergeRequest(sourceBranch, targetBranch = 'main') {
         return;
       }
 
-      // Continue with PR creation...
-      // ... rest of the existing code ...
+      // Get repository info for PR creation
+      const repoInfo = await gitService.getRemoteInfo('.');
+      const [owner, repo] = repoInfo.split('/');
 
-    } finally {
-      // Stop the server after PR creation or if user cancels
-      await stopServer();
+      // Create the pull request
+      console.log("\nCreating pull request...");
+      const pr = await githubService.createPullRequest(owner, repo, {
+        title: `Merge ${sourceBranch} into ${targetBranch}`,
+        body: `## Changes Summary\n\n${changeSummary}\n\n## Diff\n\`\`\`diff\n${diff}\n\`\`\``,
+        head: sourceBranch,
+        base: targetBranch
+      });
+
+      console.log("\nPull request created successfully!");
+      console.log(`Title: ${pr.title}`);
+      console.log(`URL: ${pr.html_url}`);
+      console.log(`Number: #${pr.number}`);
+
+    } catch (error) {
+      logger.error('Failed to create merge request:', { 
+        message: error.message, 
+        stack: error.stack,
+        sourceBranch,
+        targetBranch,
+        service: serviceName 
+      });
+      console.error(`Error creating merge request: ${error.message}`);
     }
 
   } catch (error) {
