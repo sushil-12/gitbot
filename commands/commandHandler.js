@@ -874,14 +874,27 @@ async function handleMergeRequest(sourceBranch, targetBranch = 'main') {
     console.log(chalk.blue(prUrl));
     
     // Copy the summary to clipboard for easy pasting
-    const clipboard = await import('clipboardy');
-    await clipboard.default.write(changeSummary);
-    console.log(chalk.green("\nThe changes summary has been copied to your clipboard."));
-    console.log(chalk.green("You can paste it directly into the PR description on GitHub."));
+    try {
+      const clipboard = await import('clipboardy');
+      // Ensure we're copying a string
+      const summaryText = typeof changeSummary === 'string' ? changeSummary : JSON.stringify(changeSummary, null, 2);
+      await clipboard.default.write(summaryText);
+      console.log(chalk.green("\nThe changes summary has been copied to your clipboard."));
+      console.log(chalk.green("You can paste it directly into the PR description on GitHub."));
+    } catch (clipboardError) {
+      logger.warn('Failed to copy to clipboard:', { error: clipboardError.message });
+      console.log(chalk.yellow("\nNote: Could not copy summary to clipboard. You can copy it manually from above."));
+    }
 
     // Open the URL in the default browser
-    const open = await import('open');
-    await open.default(prUrl);
+    try {
+      const open = await import('open');
+      await open.default(prUrl);
+    } catch (openError) {
+      logger.warn('Failed to open browser:', { error: openError.message });
+      console.log(chalk.yellow("\nNote: Could not open browser automatically. Please open the URL manually:"));
+      console.log(chalk.blue(prUrl));
+    }
 
   } catch (error) {
     logger.error('Failed to create merge request:', { 
