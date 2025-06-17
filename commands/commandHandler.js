@@ -1029,7 +1029,7 @@ function displayChangesSummary(diff) {
   console.log(chalk.green(`Total additions: ${additions.length}`));
   console.log(chalk.red(`Total deletions: ${deletions.length}`));
   
-  console.log('\n=== Changed Files ===');
+  console.log('\n=== Changed Files only in main ===');
   files.forEach(file => {
     const fileAdditions = additions.filter(a => a.file === file).length;
     const fileDeletions = deletions.filter(d => d.file === file).length;
