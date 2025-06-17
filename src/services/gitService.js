@@ -319,6 +319,125 @@ export async function rebaseBranch(baseBranch, directoryPath = '.', options = []
     }
 }
 
+/**
+ * Reverts the last commit.
+ * @param {string} directoryPath - The path to the Git repository.
+ * @param {boolean} noEdit - If true, does not open an editor for the revert commit message.
+ * @returns {Promise<string>} A message indicating success or failure.
+ */
+export async function revertLastCommit(directoryPath = '.', noEdit = false) {
+  const git = simpleGit(directoryPath);
+  try {
+    const options = noEdit ? ['--no-edit', 'HEAD'] : ['HEAD'];
+    await git.revert(options);
+    const message = `Successfully reverted the last commit.${noEdit ? ' (no edit)' : ''}`;
+    logger.info(message, { service: serviceName, path: directoryPath });
+    return message;
+  } catch (error) {
+    logger.error('Error reverting last commit:', { message: error.message, stack: error.stack, service: serviceName, path: directoryPath });
+    throw error;
+  }
+}
+/**
+ * Lists local and/or remote branches.
+ * @param {string} directoryPath - The path to the Git repository.
+ * @param {object} options - Options for listing branches (e.g., ['-a'] for all).
+ * @returns {Promise<import('simple-git').BranchSummary>} Branch summary.
+ */
+export async function listBranches(directoryPath = '.', options = []) {
+  const git = simpleGit(directoryPath);
+  try {
+    const branchSummary = await git.branch(options);
+    logger.debug('Fetched branches.', { branches: branchSummary.all, service: serviceName, path: directoryPath });
+    return branchSummary;
+  } catch (error) {
+    logger.error('Error listing branches:', { message: error.message, stack: error.stack, service: serviceName });
+    throw error;
+  }
+}
+
+/**
+ * Retrieves the commit log.
+ * @param {string} directoryPath - The path to the Git repository.
+ * @param {object} options - Options for the log (e.g., { maxCount: 5, file: 'path/to/file' }).
+ * @returns {Promise<import('simple-git').LogResult>} Log result.
+ */
+export async function getLog(directoryPath = '.', options = {}) {
+  const git = simpleGit(directoryPath);
+  try {
+    const log = await git.log(options);
+    logger.debug('Fetched commit log.', { count: log.total, service: serviceName, path: directoryPath });
+    return log;
+  } catch (error) {
+    logger.error('Error fetching log:', { message: error.message, stack: error.stack, service: serviceName });
+    throw error;
+  }
+}
+
+export async function getDiffBetweenBranches(sourceBranch, targetBranch, directory = '.') {
+  logger.info(`Getting diff between ${sourceBranch} and ${targetBranch}`, { service: 'GitService' });
+  try {
+    const git = simpleGit(directory);
+    const diff = await git.diff([`${targetBranch}...${sourceBranch}`]);
+    return diff;
+  } catch (error) {
+    logger.error('Failed to get diff between branches:', { 
+      message: error.message, 
+      stack: error.stack,
+      sourceBranch,
+      targetBranch,
+      service: 'GitService' 
+    });
+    throw error;
+  }
+}
+
+/**
+ * Checks if a directory is a git repository.
+ * @param {string} directoryPath - The path to check.
+ * @returns {Promise<boolean>} True if the directory is a git repository, false otherwise.
+ */
+export async function isGitRepository(directoryPath = '.') {
+  const git = simpleGit(directoryPath);
+  try {
+    await git.checkIsRepo();
+    return true;
+  } catch (error) {
+    logger.debug(`Directory is not a git repository: ${directoryPath}`, { service: serviceName });
+    return false;
+  }
+}
+
+/**
+ * Gets repository information from the remote.
+ * @param {string} directoryPath - The path to the Git repository.
+ * @returns {Promise<string>} Repository info in format "owner/repo".
+ */
+export async function getRemoteInfo(directoryPath = '.') {
+  const git = simpleGit(directoryPath);
+  try {
+    const remotes = await git.getRemotes(true);
+    const origin = remotes.find(r => r.name === 'origin');
+    if (!origin) {
+      throw new Error('No origin remote found');
+    }
+
+    // Extract owner/repo from URL
+    const url = origin.refs.push;
+    const match = url.match(/github\.com[/:]([^/]+)\/([^/.]+)(\.git)?$/);
+    if (!match) {
+      throw new Error('Could not parse GitHub repository URL');
+    }
+
+    const [, owner, repo] = match;
+    logger.info(`Got remote info: ${owner}/${repo}`, { service: serviceName, path: directoryPath });
+    return `${owner}/${repo}`;
+  } catch (error) {
+    logger.error('Error getting remote info:', { message: error.message, stack: error.stack, service: serviceName });
+    throw error;
+  }
+}
+
 // TODO: Add more functions as needed:
 // - Fetch
 // - Clone
