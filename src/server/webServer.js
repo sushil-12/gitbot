@@ -1,6 +1,7 @@
 import express from 'express';
 import path from 'path';
 import { fileURLToPath } from 'url';
+import fs from 'fs/promises';
 import logger from '../utils/logger.js';
 import { exec } from 'child_process';
 import { promisify } from 'util';
@@ -12,46 +13,53 @@ const __dirname = path.dirname(__filename);
 const app = express();
 const defaultPort = process.env.PORT || 3000;
 
-// Store diff data temporarily (in production, use a proper database)
-const diffStore = new Map();
-
-app.use(express.json());
-app.use(express.static(path.join(__dirname, 'public')));
+let diffData = new Map();
 
 // Clean up old diffs (older than 1 hour)
 setInterval(() => {
-  const oneHourAgo = Date.now() - 60 * 60 * 1000;
-  for (const [id, data] of diffStore.entries()) {
-    if (data.timestamp.getTime() < oneHourAgo) {
-      diffStore.delete(id);
+  const oneHourAgo = Date.now() - 3600000;
+  for (const [id, data] of diffData.entries()) {
+    if (parseInt(id) < oneHourAgo) {
+      diffData.delete(id);
     }
   }
-}, 15 * 60 * 1000); // Run every 15 minutes
+}, 3600000); // Run every hour
 
 export function setupDiffRoutes(app) {
+  // Increase payload size limit for all routes
+  app.use(express.json({ limit: '50mb' }));
+  
   // Serve static files for diff viewer
   app.use('/diff-viewer', express.static(path.join(__dirname, 'public')));
 
   // Serve the diff viewer page
-  app.get('/diff-viewer/:id', (req, res) => {
-    res.sendFile(path.join(__dirname, 'public', 'diff-viewer.html'));
+  app.get('/diff-viewer/:id', async (req, res) => {
+    try {
+      const htmlPath = path.join(__dirname, 'diffViewer.html');
+      let html = await fs.readFile(htmlPath, 'utf8');
+      html = html.replace('{{DIFF_ID}}', req.params.id);
+      res.send(html);
+    } catch (error) {
+      logger.error('Error serving diff viewer:', { error: error.message });
+      res.status(500).send('Error loading diff viewer');
+    }
   });
 
   // API endpoint to store diff data
   app.post('/api/diff', (req, res) => {
     const { diff, summary, sourceBranch, targetBranch } = req.body;
     const id = Date.now().toString();
-    diffStore.set(id, { diff, summary, sourceBranch, targetBranch, timestamp: new Date() });
-    res.json({ id, url: `/diff-viewer/${id}` });
+    diffData.set(id, { diff, summary, sourceBranch, targetBranch });
+    res.json({ url: `/diff-viewer/${id}` });
   });
 
   // API endpoint to get diff data
   app.get('/api/diff/:id', (req, res) => {
-    const diffData = diffStore.get(req.params.id);
-    if (!diffData) {
-      return res.status(404).json({ error: 'Diff not found' });
+    const data = diffData.get(req.params.id);
+    if (!data) {
+      return res.status(404).json({ error: 'Diff data not found' });
     }
-    res.json(diffData);
+    res.json(data);
   });
 
   logger.info('Diff viewer routes setup complete', { service: 'WebServer' });

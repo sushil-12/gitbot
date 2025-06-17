@@ -831,7 +831,7 @@ async function handleMergeRequest(sourceBranch, targetBranch = 'main') {
       // Initialize diff viewer routes if not already done
       if (!diffViewerInitialized) {
         const app = express();
-        app.use(express.json());
+        app.use(express.json({ limit: '50mb' })); // Increase payload size limit
         setupDiffRoutes(app);
         diffViewerInitialized = true;
       }
@@ -839,7 +839,15 @@ async function handleMergeRequest(sourceBranch, targetBranch = 'main') {
       // Store diff data and get viewer URL
       const response = await fetch('http://localhost:3000/api/diff', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 
+          'Content-Type': 'application/json',
+          'Content-Length': Buffer.byteLength(JSON.stringify({
+            diff,
+            summary: changeSummary,
+            sourceBranch,
+            targetBranch
+          }))
+        },
         body: JSON.stringify({
           diff,
           summary: changeSummary,
