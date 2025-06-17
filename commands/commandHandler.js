@@ -812,11 +812,47 @@ async function handleMergeRequest(sourceBranch, targetBranch = 'main') {
     }
 
     // Parse owner and repo from the remote URL
-    const match = repoInfo.match(/github\.com[:/]([^/]+)\/([^/]+)(?:\.git)?$/);
-    if (!match) {
-      throw new Error('Could not parse GitHub repository information from remote URL.');
+    let owner, repo;
+    try {
+      // Handle different GitHub URL formats
+      if (repoInfo.includes('github.com')) {
+        // Handle HTTPS URLs (https://github.com/owner/repo.git)
+        const httpsMatch = repoInfo.match(/github\.com[:/]([^/]+)\/([^/]+)(?:\.git)?$/);
+        if (httpsMatch) {
+          [, owner, repo] = httpsMatch;
+        } else {
+          // Handle SSH URLs (git@github.com:owner/repo.git)
+          const sshMatch = repoInfo.match(/github\.com:([^/]+)\/([^/]+)(?:\.git)?$/);
+          if (sshMatch) {
+            [, owner, repo] = sshMatch;
+          } else {
+            throw new Error('Could not parse GitHub repository information from remote URL.');
+          }
+        }
+      } else {
+        // Handle direct owner/repo format
+        const parts = repoInfo.split('/');
+        if (parts.length === 2) {
+          [owner, repo] = parts;
+        } else {
+          throw new Error('Could not parse GitHub repository information from remote URL.');
+        }
+      }
+
+      // Remove .git suffix if present
+      repo = repo.replace(/\.git$/, '');
+      
+      if (!owner || !repo) {
+        throw new Error('Invalid repository information: missing owner or repository name.');
+      }
+    } catch (error) {
+      logger.error('Failed to parse repository URL:', { 
+        url: repoInfo, 
+        error: error.message,
+        service: serviceName 
+      });
+      throw new Error(`Could not parse GitHub repository information: ${error.message}`);
     }
-    const [, owner, repo] = match;
 
     // 7. Generate a summary of changes using AI
     console.log("\nGenerating summary of changes...");
