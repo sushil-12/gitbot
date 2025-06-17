@@ -8,10 +8,13 @@ import { aiService, AI_PROVIDERS, setProvider } from '../src/services/aiServiceF
 import { getToken, clearAllTokens } from '../src/utils/tokenManager.js'; // Added clearAllTokens
 import inquirer from 'inquirer'; // Ensure inquirer is imported
 import chalk from 'chalk';
-import { startServer, stopServer } from '../src/server/webServer.js';
+import { startServer, stopServer, setupDiffRoutes } from '../src/server/webServer.js';
 import open from 'open';
+import express from 'express';
 
 const serviceName = 'CommandHandler';
+
+let diffViewerInitialized = false;
 
 async function ensureAuthenticated() {
   const token = await getToken('github_access_token');
@@ -821,11 +824,18 @@ async function handleMergeRequest(sourceBranch, targetBranch = 'main') {
       { max_tokens: 500 }
     );
 
-    // 8. Start web server and show diff in browser
-    console.log("\nStarting web interface to show changes...");
-    const server = await startServer();
+    // 8. Show diff in browser
+    console.log("\nPreparing to show changes in browser...");
     
     try {
+      // Initialize diff viewer routes if not already done
+      if (!diffViewerInitialized) {
+        const app = express();
+        app.use(express.json());
+        setupDiffRoutes(app);
+        diffViewerInitialized = true;
+      }
+
       // Store diff data
       const response = await fetch('http://localhost:3000/api/diff', {
         method: 'POST',
@@ -840,12 +850,11 @@ async function handleMergeRequest(sourceBranch, targetBranch = 'main') {
       
       const { url } = await response.json();
       console.log("\nOpening diff viewer in your browser...");
-      await open(url);
+      await open(`http://localhost:3000${url}`);
       
       const proceed = await prompter.askYesNo("\nDo you want to proceed with creating the merge request?", true);
       if (!proceed) {
         console.log("Merge request creation cancelled.");
-        await stopServer(server);
         return;
       }
 
@@ -854,7 +863,7 @@ async function handleMergeRequest(sourceBranch, targetBranch = 'main') {
 
     } finally {
       // Stop the server after PR creation or if user cancels
-      await stopServer(server);
+      await stopServer();
     }
 
   } catch (error) {

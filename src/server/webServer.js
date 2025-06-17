@@ -2,40 +2,21 @@ import express from 'express';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import logger from '../utils/logger.js';
+import { exec } from 'child_process';
+import { promisify } from 'util';
 
+const execAsync = promisify(exec);
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 const app = express();
-const port = process.env.PORT || 3000;
+const defaultPort = process.env.PORT || 3000;
 
 // Store diff data temporarily (in production, use a proper database)
 const diffStore = new Map();
 
 app.use(express.json());
 app.use(express.static(path.join(__dirname, 'public')));
-
-// Serve the diff viewer page
-app.get('/diff/:id', (req, res) => {
-  res.sendFile(path.join(__dirname, 'public', 'diff-viewer.html'));
-});
-
-// API endpoint to store diff data
-app.post('/api/diff', (req, res) => {
-  const { diff, summary, sourceBranch, targetBranch } = req.body;
-  const id = Date.now().toString();
-  diffStore.set(id, { diff, summary, sourceBranch, targetBranch, timestamp: new Date() });
-  res.json({ id, url: `http://localhost:${port}/diff/${id}` });
-});
-
-// API endpoint to get diff data
-app.get('/api/diff/:id', (req, res) => {
-  const diffData = diffStore.get(req.params.id);
-  if (!diffData) {
-    return res.status(404).json({ error: 'Diff not found' });
-  }
-  res.json(diffData);
-});
 
 // Clean up old diffs (older than 1 hour)
 setInterval(() => {
@@ -47,17 +28,88 @@ setInterval(() => {
   }
 }, 15 * 60 * 1000); // Run every 15 minutes
 
-export function startServer() {
-  return new Promise((resolve) => {
-    const server = app.listen(port, () => {
-      logger.info(`Web server running at http://localhost:${port}`, { service: 'WebServer' });
-      resolve(server);
-    });
+export function setupDiffRoutes(app) {
+  // Serve static files for diff viewer
+  app.use('/diff-viewer', express.static(path.join(__dirname, 'public')));
+
+  // Serve the diff viewer page
+  app.get('/diff-viewer/:id', (req, res) => {
+    res.sendFile(path.join(__dirname, 'public', 'diff-viewer.html'));
+  });
+
+  // API endpoint to store diff data
+  app.post('/api/diff', (req, res) => {
+    const { diff, summary, sourceBranch, targetBranch } = req.body;
+    const id = Date.now().toString();
+    diffStore.set(id, { diff, summary, sourceBranch, targetBranch, timestamp: new Date() });
+    res.json({ id, url: `/diff-viewer/${id}` });
+  });
+
+  // API endpoint to get diff data
+  app.get('/api/diff/:id', (req, res) => {
+    const diffData = diffStore.get(req.params.id);
+    if (!diffData) {
+      return res.status(404).json({ error: 'Diff not found' });
+    }
+    res.json(diffData);
+  });
+
+  logger.info('Diff viewer routes setup complete', { service: 'WebServer' });
+}
+
+async function killProcessOnPort(port) {
+  try {
+    // For Linux/Mac
+    const { stdout } = await execAsync(`lsof -i :${port} -t`);
+    if (stdout.trim()) {
+      const pid = stdout.trim();
+      await execAsync(`kill -9 ${pid}`);
+      logger.info(`Killed process ${pid} on port ${port}`, { service: 'WebServer' });
+    }
+  } catch (error) {
+    // If no process is found, that's fine
+    if (!error.message.includes('no process')) {
+      logger.warn(`Error killing process on port ${port}:`, { error: error.message, service: 'WebServer' });
+    }
+  }
+}
+
+export async function startServer() {
+  return new Promise(async (resolve) => {
+    try {
+      // Kill any existing process on port 3000
+      await killProcessOnPort(defaultPort);
+      
+      // Wait a moment for the port to be released
+      await new Promise(resolve => setTimeout(resolve, 1000));
+      
+      const server = app.listen(defaultPort, () => {
+        logger.info(`Web server running at http://localhost:${defaultPort}`, { service: 'WebServer' });
+        app.set('port', defaultPort);
+        resolve(server);
+      });
+
+      // Handle server errors
+      server.on('error', (error) => {
+        if (error.code === 'EADDRINUSE') {
+          logger.error(`Port ${defaultPort} is still in use after cleanup attempt`, { service: 'WebServer' });
+          throw error;
+        }
+      });
+    } catch (error) {
+      logger.error('Failed to start web server:', { error: error.message, service: 'WebServer' });
+      throw error;
+    }
   });
 }
 
 export function stopServer(server) {
   return new Promise((resolve) => {
+    if (!server) {
+      resolve();
+      return;
+    }
+    
     server.close(() => {
       logger.info('Web server stopped', { service: 'WebServer' });
       resolve();
