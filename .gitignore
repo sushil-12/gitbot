@@ -43,7 +43,6 @@ out/
 
 # Local JSON data
 data/
-*.json
 
 # Coverage directory
 coverage/
