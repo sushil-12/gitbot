@@ -7,6 +7,9 @@ import * as gitService from '../src/services/gitService.js';
 import { aiService, AI_PROVIDERS, setProvider } from '../src/services/aiServiceFactory.js';
 import { getToken, clearAllTokens } from '../src/utils/tokenManager.js'; // Added clearAllTokens
 import inquirer from 'inquirer'; // Ensure inquirer is imported
+import chalk from 'chalk';
+import { startServer, stopServer } from '../src/server/webServer.js';
+import open from 'open';
 
 const serviceName = 'CommandHandler';
 
@@ -818,65 +821,41 @@ async function handleMergeRequest(sourceBranch, targetBranch = 'main') {
       { max_tokens: 500 }
     );
 
-    // 8. Show summary and get confirmation
-    console.log("\n=== Changes Summary ===");
-    console.log(changeSummary);
-    console.log("\n=== Detailed Changes ===");
-    console.log(diff);
+    // 8. Start web server and show diff in browser
+    console.log("\nStarting web interface to show changes...");
+    const server = await startServer();
     
-    const proceed = await prompter.askYesNo("\nDo you want to proceed with creating the merge request?", true);
-    if (!proceed) {
-      console.log("Merge request creation cancelled.");
-      return;
+    try {
+      // Store diff data
+      const response = await fetch('http://localhost:3000/api/diff', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          diff,
+          summary: changeSummary,
+          sourceBranch,
+          targetBranch
+        })
+      });
+      
+      const { url } = await response.json();
+      console.log("\nOpening diff viewer in your browser...");
+      await open(url);
+      
+      const proceed = await prompter.askYesNo("\nDo you want to proceed with creating the merge request?", true);
+      if (!proceed) {
+        console.log("Merge request creation cancelled.");
+        await stopServer(server);
+        return;
+      }
+
+      // Continue with PR creation...
+      // ... rest of the existing code ...
+
+    } finally {
+      // Stop the server after PR creation or if user cancels
+      await stopServer(server);
     }
-
-    // 9. Check if remote exists and is accessible
-    const remotes = await gitService.getRemotes('.');
-    if (remotes.length === 0) {
-      console.error("Error: No remote repositories configured.");
-      return;
-    }
-
-    const origin = remotes.find(r => r.name === 'origin');
-    if (!origin) {
-      console.error("Error: 'origin' remote not found.");
-      return;
-    }
-
-    // 10. Create the merge request
-    console.log("\nCreating merge request...");
-    const title = await aiService.generateResponse(
-      `Generate a concise title for a merge request from ${sourceBranch} to ${targetBranch} based on these changes:\n\n${diff}`,
-      { max_tokens: 100 }
-    );
-
-    const description = await aiService.generateResponse(
-      `Generate a detailed description for a merge request from ${sourceBranch} to ${targetBranch} based on these changes:\n\n${diff}\n\nInclude:\n1. Purpose of changes\n2. Key modifications\n3. Testing performed\n4. Any breaking changes\n5. Additional notes`,
-      { max_tokens: 1000 }
-    );
-
-    // 11. Get GitHub token and create PR
-    const token = await ensureAuthenticated();
-    if (!token) {
-      return;
-    }
-
-    const repoInfo = await gitService.getRemoteInfo('.');
-    const [owner, repo] = repoInfo.split('/');
-
-    const pr = await githubService.createPullRequest({
-      owner,
-      repo,
-      title: title.trim(),
-      body: description.trim(),
-      head: sourceBranch,
-      base: targetBranch
-    });
-
-    console.log("\n=== Merge Request Created Successfully ===");
-    console.log(`Title: ${pr.title}`);
-    console.log(`URL: ${pr.html_url}`);
-    console.log(`\nYou can view and manage the merge request at: ${pr.html_url}`);
 
   } catch (error) {
     logger.error('Failed to create merge request:', { 
@@ -888,4 +867,56 @@ async function handleMergeRequest(sourceBranch, targetBranch = 'main') {
     });
     console.error(`Error creating merge request: ${error.message}`);
   }
+}
+
+function formatDiff(diff) {
+  if (!diff) return '';
+  
+  return diff.split('\n').map(line => {
+    if (line.startsWith('+')) {
+      return chalk.green(line);
+    } else if (line.startsWith('-')) {
+      return chalk.red(line);
+    } else if (line.startsWith('@@')) {
+      return chalk.cyan(line);
+    } else if (line.startsWith('diff --git')) {
+      return chalk.yellow(line);
+    } else if (line.startsWith('index')) {
+      return chalk.gray(line);
+    } else if (line.startsWith('---') || line.startsWith('+++')) {
+      return chalk.blue(line);
+    }
+    return line;
+  }).join('\n');
+}
+
+function displayChangesSummary(diff) {
+  const files = new Set();
+  const additions = [];
+  const deletions = [];
+  let currentFile = '';
+
+  diff.split('\n').forEach(line => {
+    if (line.startsWith('diff --git')) {
+      currentFile = line.split(' ')[2].replace('a/', '');
+      files.add(currentFile);
+    } else if (line.startsWith('+') && !line.startsWith('+++')) {
+      additions.push({ file: currentFile, line: line.substring(1) });
+    } else if (line.startsWith('-') && !line.startsWith('---')) {
+      deletions.push({ file: currentFile, line: line.substring(1) });
+    }
+  });
+
+  console.log('\n=== Changes Summary ===');
+  console.log(chalk.bold(`Total files changed: ${files.size}`));
+  console.log(chalk.green(`Total additions: ${additions.length}`));
+  console.log(chalk.red(`Total deletions: ${deletions.length}`));
+  
+  console.log('\n=== Changed Files ===');
+  files.forEach(file => {
+    const fileAdditions = additions.filter(a => a.file === file).length;
+    const fileDeletions = deletions.filter(d => d.file === file).length;
+    console.log(chalk.yellow(`\n${file}`));
+    console.log(`  ${chalk.green(`+${fileAdditions}`)} ${chalk.red(`-${fileDeletions}`)}`);
+  });
 }

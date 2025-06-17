@@ -1,0 +1,143 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>GitBot Diff Viewer</title>
+    <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/monaco-editor/0.36.1/min/vs/loader.min.js"></script>
+    <style>
+        .diff-line-added { background-color: #e6ffed; }
+        .diff-line-removed { background-color: #ffeef0; }
+        .diff-line-info { background-color: #f1f8ff; }
+        #editor { height: 70vh; border: 1px solid #e2e8f0; }
+    </style>
+</head>
+<body class="bg-gray-100">
+    <div class="container mx-auto px-4 py-8">
+        <div class="bg-white rounded-lg shadow-lg p-6">
+            <div class="flex justify-between items-center mb-6">
+                <h1 class="text-2xl font-bold text-gray-800">GitBot Diff Viewer</h1>
+                <div class="text-sm text-gray-600">
+                    <span id="branchInfo"></span>
+                </div>
+            </div>
+
+            <div class="mb-6">
+                <h2 class="text-xl font-semibold text-gray-700 mb-2">AI-Generated Summary</h2>
+                <div id="summary" class="bg-gray-50 p-4 rounded-lg text-gray-700"></div>
+            </div>
+
+            <div class="mb-4">
+                <h2 class="text-xl font-semibold text-gray-700 mb-2">Changes</h2>
+                <div id="editor"></div>
+            </div>
+
+            <div class="flex justify-between items-center mt-6">
+                <div class="text-sm text-gray-600">
+                    <span id="fileStats"></span>
+                </div>
+                <div class="space-x-4">
+                    <button onclick="window.close()" class="px-4 py-2 bg-gray-200 text-gray-700 rounded hover:bg-gray-300">
+                        Close
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let editor;
+        const diffId = window.location.pathname.split('/').pop();
+
+        // Initialize Monaco Editor
+        require.config({ paths: { vs: 'https://cdnjs.cloudflare.com/ajax/libs/monaco-editor/0.36.1/min/vs' }});
+        require(['vs/editor/editor.main'], function() {
+            editor = monaco.editor.create(document.getElementById('editor'), {
+                value: '',
+                language: 'plaintext',
+                theme: 'vs',
+                readOnly: true,
+                minimap: { enabled: true },
+                scrollBeyondLastLine: false,
+                lineNumbers: 'on',
+                renderLineHighlight: 'all',
+                automaticLayout: true
+            });
+
+            // Load diff data
+            fetch(`/api/diff/${diffId}`)
+                .then(response => response.json())
+                .then(data => {
+                    // Update branch info
+                    document.getElementById('branchInfo').textContent = 
+                        `Comparing ${data.sourceBranch} → ${data.targetBranch}`;
+
+                    // Update summary
+                    document.getElementById('summary').textContent = data.summary;
+
+                    // Set editor content with syntax highlighting
+                    editor.setValue(data.diff);
+
+                    // Add line decorations for diff
+                    const lines = data.diff.split('\n');
+                    const decorations = [];
+                    let lineNumber = 1;
+
+                    lines.forEach(line => {
+                        if (line.startsWith('+')) {
+                            decorations.push({
+                                range: new monaco.Range(lineNumber, 1, lineNumber, 1),
+                                options: { isWholeLine: true, className: 'diff-line-added' }
+                            });
+                        } else if (line.startsWith('-')) {
+                            decorations.push({
+                                range: new monaco.Range(lineNumber, 1, lineNumber, 1),
+                                options: { isWholeLine: true, className: 'diff-line-removed' }
+                            });
+                        } else if (line.startsWith('@@')) {
+                            decorations.push({
+                                range: new monaco.Range(lineNumber, 1, lineNumber, 1),
+                                options: { isWholeLine: true, className: 'diff-line-info' }
+                            });
+                        }
+                        lineNumber++;
+                    });
+
+                    editor.createDecorationsCollection(decorations);
+
+                    // Update file stats
+                    const stats = calculateStats(data.diff);
+                    document.getElementById('fileStats').textContent = 
+                        `${stats.filesChanged} files changed, ${stats.additions} additions, ${stats.deletions} deletions`;
+                })
+                .catch(error => {
+                    console.error('Error loading diff:', error);
+                    editor.setValue('Error loading diff data. Please try again.');
+                });
+        });
+
+        function calculateStats(diff) {
+            const files = new Set();
+            let additions = 0;
+            let deletions = 0;
+
+            diff.split('\n').forEach(line => {
+                if (line.startsWith('diff --git')) {
+                    files.add(line.split(' ')[2].replace('a/', ''));
+                } else if (line.startsWith('+') && !line.startsWith('+++')) {
+                    additions++;
+                } else if (line.startsWith('-') && !line.startsWith('---')) {
+                    deletions++;
+                }
+            });
+
+            return {
+                filesChanged: files.size,
+                additions,
+                deletions
+            };
+        }
+    </script>
+</body>
+</html> 

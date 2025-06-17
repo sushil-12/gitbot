@@ -408,6 +408,36 @@ export async function isGitRepository(directoryPath = '.') {
   }
 }
 
+/**
+ * Gets repository information from the remote.
+ * @param {string} directoryPath - The path to the Git repository.
+ * @returns {Promise<string>} Repository info in format "owner/repo".
+ */
+export async function getRemoteInfo(directoryPath = '.') {
+  const git = simpleGit(directoryPath);
+  try {
+    const remotes = await git.getRemotes(true);
+    const origin = remotes.find(r => r.name === 'origin');
+    if (!origin) {
+      throw new Error('No origin remote found');
+    }
+
+    // Extract owner/repo from URL
+    const url = origin.refs.push;
+    const match = url.match(/github\.com[/:]([^/]+)\/([^/.]+)(\.git)?$/);
+    if (!match) {
+      throw new Error('Could not parse GitHub repository URL');
+    }
+
+    const [, owner, repo] = match;
+    logger.info(`Got remote info: ${owner}/${repo}`, { service: serviceName, path: directoryPath });
+    return `${owner}/${repo}`;
+  } catch (error) {
+    logger.error('Error getting remote info:', { message: error.message, stack: error.stack, service: serviceName });
+    throw error;
+  }
+}
+
 // TODO: Add more functions as needed:
 // - Fetch
 // - Clone
