@@ -5,12 +5,9 @@ import path from 'path';
 import * as githubService from '../src/services/githubService.js';
 import * as gitService from '../src/services/gitService.js';
 import { aiService, AI_PROVIDERS, setProvider } from '../src/services/aiServiceFactory.js';
-import { getToken, clearAllTokens } from '../src/utils/tokenManager.js'; // Added clearAllTokens
-import inquirer from 'inquirer'; // Ensure inquirer is imported
+import { getToken, clearAllTokens } from '../src/utils/tokenManager.js';
+import inquirer from 'inquirer';
 import chalk from 'chalk';
-import { startServer, stopServer, setupDiffRoutes } from '../src/server/webServer.js';
-import open from 'open';
-import express from 'express';
 
 const serviceName = 'CommandHandler';
 
@@ -808,112 +805,47 @@ async function handleMergeRequest(sourceBranch, targetBranch = 'main') {
       }
     }
 
-    // 6. Get diff between branches
-    console.log(`\nAnalyzing changes between ${sourceBranch} and ${targetBranch}...`);
-    const diff = await gitService.getDiffBetweenBranches(sourceBranch, targetBranch, '.');
-    
-    if (!diff || diff.trim() === '') {
-      console.log(`No changes found between ${sourceBranch} and ${targetBranch}.`);
-      return;
+    // 6. Get repository info
+    const repoInfo = await gitService.getRemoteInfo('.');
+    if (!repoInfo) {
+      throw new Error('Could not determine repository information. Please ensure you have a remote repository configured.');
     }
+
+    // Parse owner and repo from the remote URL
+    const match = repoInfo.match(/github\.com[:/]([^/]+)\/([^/]+)(?:\.git)?$/);
+    if (!match) {
+      throw new Error('Could not parse GitHub repository information from remote URL.');
+    }
+    const [, owner, repo] = match;
 
     // 7. Generate a summary of changes using AI
     console.log("\nGenerating summary of changes...");
+    const diff = await gitService.getDiffBetweenBranches(sourceBranch, targetBranch, '.');
     const changeSummary = await aiService.generateResponse(
       `Please analyze this git diff and provide a concise summary of the changes. Focus on the key modifications and their impact:\n\n${diff}`,
       { max_tokens: 500 }
     );
 
-    // 8. Show diff in browser
-    console.log("\nPreparing to show changes in browser...");
+    // 8. Show summary and open GitHub's PR creation page
+    console.log("\n=== Changes Summary ===");
+    console.log(chalk.cyan(changeSummary));
     
-    try {
-      // Initialize diff viewer routes if not already done
-      if (!diffViewerInitialized) {
-        const app = express();
-        app.use(express.json({ limit: '50mb' })); // Increase payload size limit
-        setupDiffRoutes(app);
-        diffViewerInitialized = true;
-      }
+    // Construct GitHub PR URL
+    const prUrl = `https://github.com/${owner}/${repo}/compare/${targetBranch}...${sourceBranch}?expand=1`;
+    
+    console.log("\nOpening GitHub's pull request creation page...");
+    console.log(chalk.blue("\nYou can also manually open this URL:"));
+    console.log(chalk.blue(prUrl));
+    
+    // Copy the summary to clipboard for easy pasting
+    const clipboard = await import('clipboardy');
+    await clipboard.default.write(changeSummary);
+    console.log(chalk.green("\nThe changes summary has been copied to your clipboard."));
+    console.log(chalk.green("You can paste it directly into the PR description on GitHub."));
 
-      // Store diff data and get viewer URL
-      const response = await fetch('http://localhost:3000/api/diff', {
-        method: 'POST',
-        headers: { 
-          'Content-Type': 'application/json',
-          'Content-Length': Buffer.byteLength(JSON.stringify({
-            diff,
-            summary: changeSummary,
-            sourceBranch,
-            targetBranch
-          }))
-        },
-        body: JSON.stringify({
-          diff,
-          summary: changeSummary,
-          sourceBranch,
-          targetBranch
-        })
-      });
-      
-      if (!response.ok) {
-        throw new Error(`Failed to setup diff viewer: ${response.statusText}`);
-      }
-
-      const data = await response.json();
-      if (!data || !data.url) {
-        throw new Error('Invalid response from diff viewer setup');
-      }
-
-      const fullUrl = `http://localhost:3000${data.url}`;
-      
-      console.log("\nPlease review the changes at this URL:");
-      console.log(chalk.blue(fullUrl));
-      console.log("\nYou can copy and paste this URL into your browser.");
-      
-      const proceed = await prompter.askYesNo("\nDo you want to proceed with creating the merge request?", true);
-      if (!proceed) {
-        console.log("Merge request creation cancelled.");
-        return;
-      }
-
-      // Get repository info for PR creation
-      const repoInfo = await gitService.getRemoteInfo('.');
-      if (!repoInfo) {
-        throw new Error('Could not determine repository information. Please ensure you have a remote repository configured.');
-      }
-
-      // Parse owner and repo from the remote URL
-      const match = repoInfo.match(/github\.com[:/]([^/]+)\/([^/]+)(?:\.git)?$/);
-      if (!match) {
-        throw new Error('Could not parse GitHub repository information from remote URL.');
-      }
-      const [, owner, repo] = match;
-
-      // Create the pull request
-      console.log("\nCreating pull request...");
-      const pr = await githubService.createPullRequest(owner, repo, {
-        title: `Merge ${sourceBranch} into ${targetBranch}`,
-        body: `## Changes Summary\n\n${changeSummary}\n\n## Diff\n\`\`\`diff\n${diff}\n\`\`\``,
-        head: sourceBranch,
-        base: targetBranch
-      });
-
-      console.log("\nPull request created successfully!");
-      console.log(`Title: ${pr.title}`);
-      console.log(`URL: ${pr.html_url}`);
-      console.log(`Number: #${pr.number}`);
-
-    } catch (error) {
-      logger.error('Failed to create merge request:', { 
-        message: error.message, 
-        stack: error.stack,
-        sourceBranch,
-        targetBranch,
-        service: serviceName 
-      });
-      console.error(`Error creating merge request: ${error.message}`);
-    }
+    // Open the URL in the default browser
+    const open = await import('open');
+    await open.default(prUrl);
 
   } catch (error) {
     logger.error('Failed to create merge request:', { 
