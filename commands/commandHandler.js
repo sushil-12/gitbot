@@ -4,7 +4,7 @@ import fs from 'fs/promises';
 import path from 'path';
 import * as githubService from '../src/services/githubService.js';
 import * as gitService from '../src/services/gitService.js';
-import * as ollamaService from '../ai/ollamaService.js';
+import { aiService, AI_PROVIDERS, setProvider } from '../src/services/aiServiceFactory.js';
 import { getToken, clearAllTokens } from '../src/utils/tokenManager.js'; // Added clearAllTokens
 import inquirer from 'inquirer'; // Ensure inquirer is imported
 
@@ -170,21 +170,21 @@ export async function handleNlpCommand(query) {
     return;
   }
 
-  const ollamaReady = await ollamaService.checkOllamaStatus();
-  if (!ollamaReady) {
-      console.error("Ollama server or model is not available. Please check your Ollama setup.");
-      logger.error("Ollama not ready, aborting NLP command.", { service: serviceName });
-      return;
+  const aiReady = await aiService.checkStatus();
+  if (!aiReady) {
+    console.error("AI service is not available. Please check your AI provider setup.");
+    logger.error("AI service not ready, aborting NLP command.", { service: serviceName });
+    return;
   }
 
   try {
-    const parsed = await ollamaService.parseIntent(query);
+    const parsed = await aiService.parseIntent(query);
     if (!parsed || parsed.intent === 'unknown') {
       console.log("Sorry, I couldn't understand that command. Could you try rephrasing?");
       logger.warn('NLP intent parsing failed or returned unknown.', { query, parsedResult: parsed, service: serviceName });
       if (parsed && parsed.entities && parsed.entities.error) {
-          console.error(`Details: ${parsed.entities.error}`);
-          if(parsed.entities.raw_response) console.log(`LLM Raw: ${parsed.entities.raw_response}`);
+        console.error(`Details: ${parsed.entities.error}`);
+        if(parsed.entities.raw_response) console.log(`LLM Raw: ${parsed.entities.raw_response}`);
       }
       return;
     }
@@ -612,6 +612,15 @@ export async function handleNlpCommand(query) {
           logger.error('Failed to revert last commit via NLP:', { message: error.message, stack: error.stack, service: serviceName });
         }
         break;
+      case 'create_merge_request': {
+        const sourceBranch = parsed.entities?.source_branch === 'current branch' 
+          ? await gitService.getCurrentBranch('.')
+          : parsed.entities?.source_branch;
+        const targetBranch = parsed.entities?.target_branch || 'main';
+        
+        await handleMergeRequest(sourceBranch, targetBranch);
+        break;
+      }
       default:
         console.log(`Intent '${parsed.intent}' is recognized but not yet implemented.`);
         logger.info(`NLP intent '${parsed.intent}' not yet implemented.`, { service: serviceName });
@@ -629,21 +638,21 @@ export async function handleGenerateGitignore(projectDescription) {
         return;
     }
 
-    const ollamaReady = await ollamaService.checkOllamaStatus();
-    if (!ollamaReady) {
-        console.error("Ollama server or model is not available. Please check your Ollama setup.");
+    const aiReady = await aiService.checkStatus();
+    if (!aiReady) {
+        console.error("AI service is not available. Please check your AI provider setup.");
         return;
     }
 
     try {
-        const gitignoreContent = await ollamaService.generateGitignore(projectDescription);
+        const gitignoreContent = await aiService.generateGitignore(projectDescription);
         if (gitignoreContent) {
             console.log("\n--- Suggested .gitignore content ---\n");
             console.log(gitignoreContent);
             console.log("\n--- End of .gitignore content ---");
             // TODO: Add option to write this to .gitignore file
         } else {
-            console.log("Could not generate .gitignore content. The LLM might have returned an empty response.");
+            console.log("Could not generate .gitignore content. The AI service might have returned an empty response.");
         }
     } catch (error) {
         console.error(`Error generating .gitignore: ${error.message}`);
@@ -653,9 +662,9 @@ export async function handleGenerateGitignore(projectDescription) {
 export async function handleGenerateCommitMessage(directoryPath = '.') {
     logger.info(`Handling commit message generation for path: "${directoryPath}"`, { service: serviceName });
 
-    const ollamaReady = await ollamaService.checkOllamaStatus();
-    if (!ollamaReady) {
-        console.error("Ollama server or model is not available. Please check your Ollama setup.");
+    const aiReady = await aiService.checkStatus();
+    if (!aiReady) {
+        console.error("AI service is not available. Please check your AI provider setup.");
         return;
     }
 
@@ -666,18 +675,15 @@ export async function handleGenerateCommitMessage(directoryPath = '.') {
             return;
         }
 
-        // For simplicity, we'll use `git diff HEAD` which shows staged and unstaged changes.
-        // A more precise approach might be `git diff --staged` for staged changes only.
         const git = simpleGit(directoryPath);
         const diffOutput = await git.diff(['HEAD']);
-
 
         if (!diffOutput || diffOutput.trim() === '') {
             console.log("No diff output available. Ensure changes are staged or present in the working directory.");
             return;
         }
 
-        const commitMessage = await ollamaService.generateCommitMessage(diffOutput);
+        const commitMessage = await aiService.generateCommitMessage(diffOutput);
         if (commitMessage) {
             console.log(`\nSuggested commit message:`);
             console.log(`"${commitMessage}"`);
@@ -690,6 +696,7 @@ export async function handleGenerateCommitMessage(directoryPath = '.') {
     }
     
 }
+
 export async function handleAuthLogout() {
     logger.info("Handling auth logout command...", { service: serviceName });
     try {
@@ -712,4 +719,173 @@ export async function handleAuthLogout() {
         "An error occurred while trying to clear authentication tokens."
     );
     }
+}
+
+// Add a new command to switch AI providers
+export async function handleSwitchAIProvider(provider) {
+  if (!provider || !Object.values(AI_PROVIDERS).includes(provider)) {
+    console.error(`Invalid AI provider. Supported providers: ${Object.values(AI_PROVIDERS).join(', ')}`);
+    return;
+  }
+
+  const success = setProvider(provider);
+  if (success) {
+    console.log(`Switched to AI provider: ${provider}`);
+    const isReady = await aiService.checkStatus();
+    if (isReady) {
+      console.log(`${provider} service is ready to use.`);
+    } else {
+      console.error(`${provider} service is not available. Please check your setup.`);
+    }
+  } else {
+    console.error(`Failed to switch to AI provider: ${provider}`);
+  }
+}
+
+async function handleMergeRequest(sourceBranch, targetBranch = 'main') {
+  logger.info(`Handling merge request from ${sourceBranch} to ${targetBranch}`, { service: serviceName });
+  
+  try {
+    // 1. Check if we're in a git repository
+    const isGitRepo = await gitService.isGitRepository('.');
+    if (!isGitRepo) {
+      console.error("Error: Not a git repository. Please run this command from a git repository.");
+      return;
+    }
+
+    // 2. Get current branch and verify it's not the target branch
+    const currentBranch = await gitService.getCurrentBranch('.');
+    if (currentBranch === targetBranch) {
+      console.error(`Error: You are already on the target branch '${targetBranch}'. Please switch to your feature branch first.`);
+      return;
+    }
+
+    // 3. Check if source branch exists
+    const branches = await gitService.listBranches('.');
+    if (!branches.all.includes(sourceBranch)) {
+      console.error(`Error: Source branch '${sourceBranch}' does not exist.`);
+      return;
+    }
+
+    // 4. Check if target branch exists
+    if (!branches.all.includes(targetBranch)) {
+      console.error(`Error: Target branch '${targetBranch}' does not exist.`);
+      return;
+    }
+
+    // 5. Check for uncommitted changes
+    const status = await gitService.getStatus('.');
+    if (status.files.length > 0) {
+      console.log("\nYou have uncommitted changes:");
+      status.files.forEach(file => {
+        console.log(`  ${file.path} (${file.working_dir})`);
+      });
+      
+      const shouldCommit = await prompter.askYesNo("\nWould you like to commit these changes before creating the merge request?", true);
+      if (shouldCommit) {
+        const { commitMessage } = await inquirer.prompt([
+          {
+            type: 'input',
+            name: 'commitMessage',
+            message: 'Enter commit message:',
+            default: `feat: changes before merge request to ${targetBranch}`,
+            validate: input => input.trim() !== '' || 'Commit message cannot be empty'
+          }
+        ]);
+        
+        await gitService.addFiles('.', '.');
+        await gitService.commitChanges(commitMessage, '.');
+        console.log("Changes committed successfully.");
+      } else {
+        console.log("Please commit or stash your changes before creating a merge request.");
+        return;
+      }
+    }
+
+    // 6. Get diff between branches
+    console.log(`\nAnalyzing changes between ${sourceBranch} and ${targetBranch}...`);
+    const diff = await gitService.getDiffBetweenBranches(sourceBranch, targetBranch, '.');
+    
+    if (!diff || diff.trim() === '') {
+      console.log(`No changes found between ${sourceBranch} and ${targetBranch}.`);
+      return;
+    }
+
+    // 7. Generate a summary of changes using AI
+    console.log("\nGenerating summary of changes...");
+    const changeSummary = await aiService.generateResponse(
+      `Please analyze this git diff and provide a concise summary of the changes. Focus on the key modifications and their impact:\n\n${diff}`,
+      { max_tokens: 500 }
+    );
+
+    // 8. Show summary and get confirmation
+    console.log("\n=== Changes Summary ===");
+    console.log(changeSummary);
+    console.log("\n=== Detailed Changes ===");
+    console.log(diff);
+    
+    const proceed = await prompter.askYesNo("\nDo you want to proceed with creating the merge request?", true);
+    if (!proceed) {
+      console.log("Merge request creation cancelled.");
+      return;
+    }
+
+    // 9. Check if remote exists and is accessible
+    const remotes = await gitService.getRemotes('.');
+    if (remotes.length === 0) {
+      console.error("Error: No remote repositories configured.");
+      return;
+    }
+
+    const origin = remotes.find(r => r.name === 'origin');
+    if (!origin) {
+      console.error("Error: 'origin' remote not found.");
+      return;
+    }
+
+    // 10. Create the merge request
+    console.log("\nCreating merge request...");
+    const title = await aiService.generateResponse(
+      `Generate a concise title for a merge request from ${sourceBranch} to ${targetBranch} based on these changes:\n\n${diff}`,
+      { max_tokens: 100 }
+    );
+
+    const description = await aiService.generateResponse(
+      `Generate a detailed description for a merge request from ${sourceBranch} to ${targetBranch} based on these changes:\n\n${diff}\n\nInclude:\n1. Purpose of changes\n2. Key modifications\n3. Testing performed\n4. Any breaking changes\n5. Additional notes`,
+      { max_tokens: 1000 }
+    );
+
+    // 11. Get GitHub token and create PR
+    const token = await ensureAuthenticated();
+    if (!token) {
+      return;
+    }
+
+    const repoInfo = await gitService.getRemoteInfo('.');
+    const [owner, repo] = repoInfo.split('/');
+
+    const pr = await githubService.createPullRequest({
+      owner,
+      repo,
+      title: title.trim(),
+      body: description.trim(),
+      head: sourceBranch,
+      base: targetBranch
+    });
+
+    console.log("\n=== Merge Request Created Successfully ===");
+    console.log(`Title: ${pr.title}`);
+    console.log(`URL: ${pr.html_url}`);
+    console.log(`\nYou can view and manage the merge request at: ${pr.html_url}`);
+
+  } catch (error) {
+    logger.error('Failed to create merge request:', { 
+      message: error.message, 
+      stack: error.stack,
+      sourceBranch,
+      targetBranch,
+      service: serviceName 
+    });
+    console.error(`Error creating merge request: ${error.message}`);
+  }
 }

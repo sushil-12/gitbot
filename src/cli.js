@@ -3,7 +3,7 @@ import dotenv from 'dotenv';
 import { Command, Option } from 'commander';
 import logger from './utils/logger.js';
 import * as commandHandler from '../commands/commandHandler.js';
-import { checkOllamaStatus } from '../ai/ollamaService.js'; // For a startup check
+import { AI_PROVIDERS, aiService, getCurrentProvider } from './services/aiServiceFactory.js';
 
 dotenv.config();
 const program = new Command();
@@ -125,15 +125,24 @@ async function main() {
   // Utility/Status Commands
   program
     .command('check-ai')
-    .description('Check the status of the Ollama server and configured model.')
+    .description('Check the status of the current AI service provider.')
     .action(async () => {
-        logger.info("Checking Ollama status...", { service: 'CLI' });
-        const isReady = await checkOllamaStatus();
-        if (isReady) {
-            console.log(`Ollama server is up and model '${process.env.OLLAMA_MODEL || 'default'}' is available.`);
-        } else {
-            console.error(`Ollama server or model '${process.env.OLLAMA_MODEL || 'default'}' is not available. Please check your Ollama setup and .env configuration.`);
-        }
+      const currentProvider = getCurrentProvider();
+      logger.info(`Checking ${currentProvider} service status...`, { service: 'CLI' });
+      const isReady = await aiService.checkStatus();
+      if (isReady) {
+        console.log(`${currentProvider} service is up and ready to use.`);
+      } else {
+        console.error(`${currentProvider} service is not available. Please check your setup and .env configuration.`);
+      }
+    });
+
+  program
+    .command('switch-ai')
+    .description('Switch between different AI service providers.')
+    .argument('<provider>', 'The AI provider to switch to (ollama or mistral)')
+    .action(async (provider) => {
+      await commandHandler.handleSwitchAIProvider(provider);
     });
 
   // Global options

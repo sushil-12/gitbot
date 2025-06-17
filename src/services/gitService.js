@@ -373,6 +373,41 @@ export async function getLog(directoryPath = '.', options = {}) {
     throw error;
   }
 }
+
+export async function getDiffBetweenBranches(sourceBranch, targetBranch, directory = '.') {
+  logger.info(`Getting diff between ${sourceBranch} and ${targetBranch}`, { service: 'GitService' });
+  try {
+    const git = simpleGit(directory);
+    const diff = await git.diff([`${targetBranch}...${sourceBranch}`]);
+    return diff;
+  } catch (error) {
+    logger.error('Failed to get diff between branches:', { 
+      message: error.message, 
+      stack: error.stack,
+      sourceBranch,
+      targetBranch,
+      service: 'GitService' 
+    });
+    throw error;
+  }
+}
+
+/**
+ * Checks if a directory is a git repository.
+ * @param {string} directoryPath - The path to check.
+ * @returns {Promise<boolean>} True if the directory is a git repository, false otherwise.
+ */
+export async function isGitRepository(directoryPath = '.') {
+  const git = simpleGit(directoryPath);
+  try {
+    await git.checkIsRepo();
+    return true;
+  } catch (error) {
+    logger.debug(`Directory is not a git repository: ${directoryPath}`, { service: serviceName });
+    return false;
+  }
+}
+
 // TODO: Add more functions as needed:
 // - Fetch
 // - Clone
