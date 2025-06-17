@@ -854,15 +854,67 @@ async function handleMergeRequest(sourceBranch, targetBranch = 'main') {
       throw new Error(`Could not parse GitHub repository information: ${error.message}`);
     }
 
-    // 7. Generate a summary of changes using AI
-    console.log("\nGenerating summary of changes...");
+    // 7. Check if source branch has been pushed to remote
+    const remoteBranches = await gitService.listBranches('.', ['-r']);
+    const sourceBranchRemote = `remotes/origin/${sourceBranch}`;
+    if (!remoteBranches.all.includes(sourceBranchRemote)) {
+      console.log(`\nBranch '${sourceBranch}' has not been pushed to remote yet.`);
+      const shouldPush = await prompter.askYesNo("Would you like to push this branch to remote now?", true);
+      if (shouldPush) {
+        try {
+          await gitService.pushChanges('origin', sourceBranch, '.', true);
+          console.log(`Successfully pushed branch '${sourceBranch}' to remote.`);
+        } catch (pushError) {
+          throw new Error(`Failed to push branch: ${pushError.message}`);
+        }
+      } else {
+        console.log("Please push your branch to remote before creating a pull request.");
+        return;
+      }
+    }
+
+    // 8. Check if there are any differences between branches
     const diff = await gitService.getDiffBetweenBranches(sourceBranch, targetBranch, '.');
+    if (!diff || diff.trim() === '') {
+      console.log(`\nNo differences found between '${sourceBranch}' and '${targetBranch}'.`);
+      console.log("This could mean:");
+      console.log("1. The branches are identical");
+      console.log("2. All changes from source branch are already in target branch");
+      console.log("3. The source branch has no commits");
+      
+      const showLog = await prompter.askYesNo("\nWould you like to see the commit history of both branches?", true);
+      if (showLog) {
+        console.log(`\n=== Commits in ${sourceBranch} ===`);
+        const sourceLog = await gitService.getLog('.', { branch: sourceBranch });
+        if (sourceLog.total === 0) {
+          console.log("No commits found in source branch.");
+        } else {
+          sourceLog.all.forEach(commit => {
+            console.log(`- ${commit.hash.substring(0, 7)} ${commit.message}`);
+          });
+        }
+
+        console.log(`\n=== Commits in ${targetBranch} ===`);
+        const targetLog = await gitService.getLog('.', { branch: targetBranch });
+        if (targetLog.total === 0) {
+          console.log("No commits found in target branch.");
+        } else {
+          targetLog.all.forEach(commit => {
+            console.log(`- ${commit.hash.substring(0, 7)} ${commit.message}`);
+          });
+        }
+      }
+      return;
+    }
+
+    // 9. Generate a summary of changes using AI
+    console.log("\nGenerating summary of changes...");
     const changeSummary = await aiService.generateResponse(
       `Please analyze this git diff and provide a concise summary of the changes. Focus on the key modifications and their impact:\n\n${diff}`,
       { max_tokens: 500 }
     );
 
-    // 8. Show summary and open GitHub's PR creation page
+    // 10. Show summary and open GitHub's PR creation page
     console.log("\n=== Changes Summary ===");
     console.log(chalk.cyan(changeSummary));
     
