@@ -836,7 +836,7 @@ async function handleMergeRequest(sourceBranch, targetBranch = 'main') {
         diffViewerInitialized = true;
       }
 
-      // Store diff data
+      // Store diff data and get viewer URL
       const response = await fetch('http://localhost:3000/api/diff', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -848,8 +848,16 @@ async function handleMergeRequest(sourceBranch, targetBranch = 'main') {
         })
       });
       
-      const { url } = await response.json();
-      const fullUrl = `http://localhost:3000${url}`;
+      if (!response.ok) {
+        throw new Error(`Failed to setup diff viewer: ${response.statusText}`);
+      }
+
+      const data = await response.json();
+      if (!data || !data.url) {
+        throw new Error('Invalid response from diff viewer setup');
+      }
+
+      const fullUrl = `http://localhost:3000${data.url}`;
       
       console.log("\nPlease review the changes at this URL:");
       console.log(chalk.blue(fullUrl));
@@ -863,7 +871,16 @@ async function handleMergeRequest(sourceBranch, targetBranch = 'main') {
 
       // Get repository info for PR creation
       const repoInfo = await gitService.getRemoteInfo('.');
-      const [owner, repo] = repoInfo.split('/');
+      if (!repoInfo) {
+        throw new Error('Could not determine repository information. Please ensure you have a remote repository configured.');
+      }
+
+      // Parse owner and repo from the remote URL
+      const match = repoInfo.match(/github\.com[:/]([^/]+)\/([^/]+)(?:\.git)?$/);
+      if (!match) {
+        throw new Error('Could not parse GitHub repository information from remote URL.');
+      }
+      const [, owner, repo] = match;
 
       // Create the pull request
       console.log("\nCreating pull request...");
