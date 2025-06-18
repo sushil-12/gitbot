@@ -2,9 +2,6 @@ import express from 'express';
 import session from 'express-session';
 import passport from 'passport';
 import GitHubStrategy from 'passport-github2';
-import { credentialManager } from '../src/utils/credentialManager.js';
-import { config } from '../src/config/index.js';
-import { logger } from '../src/utils/logger.js';
 
 const app = express();
 
@@ -23,17 +20,19 @@ app.use(passport.initialize());
 app.use(passport.session());
 
 // Setup Passport with GitHub OAuth
-async function setupPassport() {
-  const credentials = await credentialManager.getCredentials();
+function setupPassport() {
+  const clientId = process.env.GITHUB_CLIENT_ID;
+  const clientSecret = process.env.GITHUB_CLIENT_SECRET;
+  const callbackURL = process.env.GITHUB_CALLBACK_URL || 'https://your-domain.vercel.app/auth/github/callback';
   
-  if (!credentials || !credentials.clientId || !credentials.clientSecret) {
-    throw new Error('GitHub OAuth credentials not available.');
+  if (!clientId || !clientSecret) {
+    throw new Error('GitHub OAuth credentials not available. Please set GITHUB_CLIENT_ID and GITHUB_CLIENT_SECRET environment variables.');
   }
 
   passport.use(new GitHubStrategy({
-    clientID: credentials.clientId,
-    clientSecret: credentials.clientSecret,
-    callbackURL: process.env.GITHUB_CALLBACK_URL || 'https://your-domain.vercel.app/auth/github/callback'
+    clientID: clientId,
+    clientSecret: clientSecret,
+    callbackURL: callbackURL
   }, (accessToken, refreshToken, profile, done) => {
     const user = {
       id: profile.id,
@@ -55,7 +54,16 @@ async function setupPassport() {
   });
 }
 
-// Routes
+// Health check endpoint
+app.get('/health', (req, res) => {
+  res.json({ 
+    status: 'ok', 
+    timestamp: new Date().toISOString(),
+    service: 'gitmate-auth'
+  });
+});
+
+// GitHub OAuth routes
 app.get('/auth/github', passport.authenticate('github', { scope: ['user', 'repo'] }));
 
 app.get('/auth/github/callback', 
@@ -63,18 +71,6 @@ app.get('/auth/github/callback',
   (req, res) => {
     const user = req.user;
     
-    // Store tokens in config (this will be handled by the client)
-    const tokenData = {
-      accessToken: user.accessToken,
-      refreshToken: user.refreshToken,
-      user: {
-        id: user.id,
-        username: user.username,
-        displayName: user.displayName,
-        email: user.email
-      }
-    };
-
     // Send success response with token data
     res.send(`
       <!DOCTYPE html>
@@ -123,7 +119,16 @@ app.get('/auth/github/callback',
           if (window.opener) {
             window.opener.postMessage({
               type: 'GITHUB_AUTH_SUCCESS',
-              data: ${JSON.stringify(tokenData)}
+              data: {
+                accessToken: '${user.accessToken}',
+                refreshToken: '${user.refreshToken}',
+                user: {
+                  id: '${user.id}',
+                  username: '${user.username}',
+                  displayName: '${user.displayName}',
+                  email: '${user.email}'
+                }
+              }
             }, '*');
           }
         </script>
@@ -171,7 +176,7 @@ app.get('/auth/failure', (req, res) => {
 });
 
 // Initialize passport
-setupPassport().catch(console.error);
+setupPassport();
 
 // Export for Vercel
 export default app; 
