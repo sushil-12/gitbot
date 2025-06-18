@@ -2,7 +2,7 @@
   "version": 2,
   "functions": {
     "api/auth.js": {
-      "runtime": "nodejs"
+      "runtime": "nodejs@18.x"
     }
   },
   "routes": [
@@ -11,4 +11,4 @@
       "dest": "/api/auth.js"
     }
   ]
-} 
+}
