@@ -8,7 +8,7 @@
   },
   "type": "module",
   "scripts": {
-    "start": "node bin/gitmate.js",
+    "start": "node api/auth.js",
     "dev": "node --watch bin/gitmate.js",
     "test": "echo \"No tests yet\"",
     "lint": "eslint src/ bin/",
