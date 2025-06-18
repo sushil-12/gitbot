@@ -1,64 +1,92 @@
 {
-  "name": "gitbot-assistant",
+  "name": "sushil-gitmate",
   "version": "1.0.0",
-  "description": "A professional Git assistant with AI-powered natural language processing",
-  "main": "index.js",
+  "description": "Professional Git workflow automation powered by AI. Streamline your development process with natural language commands and intelligent automation.",
+  "main": "src/index.js",
+  "bin": {
+    "gitmate": "./bin/gitmate.js"
+  },
   "type": "module",
   "scripts": {
-    "start": "node index.js",
-    "dev": "NODE_ENV=development node index.js",
-    "prod": "NODE_ENV=production node index.js",
-    "test": "jest",
-    "lint": "eslint .",
-    "format": "prettier --write .",
-    "setup": "node scripts/setup.js",
-    "build": "node scripts/build.js"
-  },
-  "dependencies": {
-    "axios": "^1.6.0",
-    "boxen": "^7.1.1",
-    "chalk": "^5.3.0",
-    "clipboardy": "^3.0.0",
-    "commander": "^14.0.0",
-    "dotenv": "^16.3.1",
-    "express": "^4.18.2",
-    "express-session": "^1.17.3",
-    "gradient-string": "^2.0.2",
-    "inquirer": "^9.2.12",
-    "open": "^10.0.2",
-    "ora": "^7.0.1",
-    "passport": "^0.7.0",
-    "passport-github2": "^0.1.12",
-    "simple-git": "^3.20.0",
-    "terminal-link": "^4.0.0",
-    "winston": "^3.11.0"
-  },
-  "devDependencies": {
-    "eslint": "^8.54.0",
-    "jest": "^29.7.0",
-    "nodemon": "^3.0.1",
-    "prettier": "^3.1.0"
-  },
-  "engines": {
-    "node": ">=18.0.0"
+    "start": "node bin/gitmate.js",
+    "dev": "node --watch bin/gitmate.js",
+    "test": "echo \"No tests yet\"",
+    "lint": "eslint src/ bin/",
+    "format": "prettier --write src/ bin/",
+    "build": "echo 'No build step required'",
+    "prepublishOnly": "npm run lint && npm run test",
+    "setup-credentials": "node scripts/setup-credentials.js",
+    "generate-credentials": "node scripts/generate-distribution-credentials.js"
   },
   "keywords": [
     "git",
     "ai",
-    "assistant",
-    "cli",
-    "github",
     "automation",
-    "productivity"
+    "workflow",
+    "github",
+    "cli",
+    "natural-language",
+    "developer-tools",
+    "version-control",
+    "repository-management"
   ],
-  "author": "Sushil Kumar",
+  "author": {
+    "name": "Sushil",
+    "email": "sushil@example.com",
+    "url": "https://github.com/sushil-12"
+  },
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "https://github.com/yourusername/gitbot-assistant.git"
+    "url": "https://github.com/sushil-12/gitbot-assistant.git"
   },
   "bugs": {
-    "url": "https://github.com/yourusername/gitbot-assistant/issues"
+    "url": "https://github.com/sushil-12/gitbot-assistant/issues"
   },
-  "homepage": "https://github.com/yourusername/gitbot-assistant#readme"
+  "homepage": "https://github.com/sushil-12/gitbot-assistant#readme",
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "files": [
+    "bin/",
+    "src/",
+    "commands/",
+    "README.md",
+    "LICENSE"
+  ],
+  "dependencies": {
+    "inquirer": "^9.2.12",
+    "chalk": "^5.3.0",
+    "simple-git": "^3.19.0",
+    "openai": "^4.20.1",
+    "@anthropic-ai/sdk": "^0.9.0",
+    "clipboardy": "^3.0.0",
+    "open": "^10.0.1",
+    "dotenv": "^16.3.1",
+    "winston": "^3.11.0",
+    "express": "^4.18.2",
+    "express-session": "^1.17.3",
+    "passport": "^0.7.0",
+    "passport-github2": "^0.1.12",
+    "axios": "^1.6.0",
+    "boxen": "^7.1.1",
+    "gradient-string": "^2.0.2",
+    "ora": "^7.0.1",
+    "terminal-link": "^4.0.0",
+    "commander": "^14.0.0"
+  },
+  "devDependencies": {
+    "eslint": "^8.55.0",
+    "prettier": "^3.1.0"
+  },
+  "preferGlobal": true,
+  "os": [
+    "darwin",
+    "linux",
+    "win32"
+  ],
+  "cpu": [
+    "x64",
+    "arm64"
+  ]
 }

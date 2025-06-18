@@ -1,0 +1,816 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>GitBot Assistant - AI-Powered Git Workflow Automation</title>
+    
+    <!-- Tailwind CSS with Inter font -->
+    <script src="https://cdn.tailwindcss.com?plugins=forms,typography,aspect-ratio"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    
+    <!-- Font Awesome -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    
+    <!-- Prism.js for syntax highlighting -->
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/themes/prism-tomorrow.min.css" rel="stylesheet" />
+    
+    <!-- Custom styles -->
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+            scroll-behavior: smooth;
+        }
+        
+        .gradient-text {
+            background: linear-gradient(90deg, #3b82f6, #8b5cf6);
+            -webkit-background-clip: text;
+            background-clip: text;
+            color: transparent;
+        }
+        
+        .gradient-bg {
+            background: linear-gradient(135deg, #3b82f6 0%, #8b5cf6 100%);
+        }
+        
+        .feature-card {
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            border-radius: 12px;
+            overflow: hidden;
+        }
+        
+        .feature-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
+        }
+        
+        .command-block {
+            position: relative;
+            border-radius: 8px;
+            overflow: hidden;
+        }
+        
+        .command-block::before {
+            content: '$';
+            position: absolute;
+            left: 12px;
+            top: 12px;
+            color: #8b5cf6;
+            font-weight: bold;
+        }
+        
+        .command-block pre {
+            padding-left: 24px !important;
+        }
+        
+        .nav-link {
+            position: relative;
+        }
+        
+        .nav-link::after {
+            content: '';
+            position: absolute;
+            bottom: -2px;
+            left: 0;
+            width: 0;
+            height: 2px;
+            background: #3b82f6;
+            transition: width 0.3s ease;
+        }
+        
+        .nav-link:hover::after {
+            width: 100%;
+        }
+        
+        .active-nav::after {
+            width: 100%;
+        }
+    </style>
+</head>
+<body class="bg-gray-50 antialiased">
+    <!-- Navigation -->
+    <nav class="bg-white shadow-sm sticky top-0 z-50 backdrop-blur-sm bg-opacity-90">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="flex justify-between h-16 items-center">
+                <div class="flex items-center space-x-3">
+                    <div class="flex items-center justify-center w-10 h-10 rounded-lg bg-gradient-to-br from-blue-500 to-purple-500">
+                        <i class="fas fa-robot text-white text-xl"></i>
+                    </div>
+                    <span class="text-xl font-bold bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">GitBot</span>
+                </div>
+                <div class="hidden md:flex items-center space-x-8">
+                    <a href="#features" class="nav-link text-gray-700 hover:text-gray-900 font-medium text-sm">Features</a>
+                    <a href="#installation" class="nav-link text-gray-700 hover:text-gray-900 font-medium text-sm">Installation</a>
+                    <a href="#usage" class="nav-link text-gray-700 hover:text-gray-900 font-medium text-sm">Usage</a>
+                    <a href="#commands" class="nav-link text-gray-700 hover:text-gray-900 font-medium text-sm">Commands</a>
+                    <a href="#examples" class="nav-link text-gray-700 hover:text-gray-900 font-medium text-sm">Examples</a>
+                    <a href="https://github.com/yourusername/gitbot-assistant" target="_blank" class="ml-4 inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-gradient-to-r from-blue-500 to-purple-500 hover:from-blue-600 hover:to-purple-600 transition-all duration-300">
+                        GitHub
+                    </a>
+                </div>
+                <button class="md:hidden text-gray-500 hover:text-gray-900 focus:outline-none">
+                    <i class="fas fa-bars text-xl"></i>
+                </button>
+            </div>
+        </div>
+    </nav>
+
+    <!-- Hero Section -->
+    <section class="gradient-bg text-white">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-24">
+            <div class="text-center">
+                <h1 class="text-5xl font-bold mb-6 leading-tight">
+                    Revolutionize Your <span class="gradient-text">Git Workflow</span>
+                </h1>
+                <p class="text-xl mb-8 max-w-3xl mx-auto opacity-90">
+                    GitBot Assistant transforms how you interact with Git using natural language commands and AI-powered automation.
+                </p>
+                <div class="flex flex-col sm:flex-row justify-center gap-4">
+                    <a href="#installation" class="inline-flex items-center justify-center px-8 py-3.5 text-base font-semibold text-blue-600 bg-white rounded-lg hover:bg-gray-50 transition-all duration-300 shadow-sm">
+                        <i class="fas fa-download mr-2"></i> Get Started
+                    </a>
+                    <a href="#examples" class="inline-flex items-center justify-center px-8 py-3.5 text-base font-semibold text-white border-2 border-white rounded-lg hover:bg-white hover:text-blue-600 transition-all duration-300">
+                        <i class="fas fa-play mr-2"></i> View Demo
+                    </a>
+                </div>
+            </div>
+        </div>
+        <div class="relative">
+            <div class="absolute inset-x-0 bottom-0 h-64 bg-gradient-to-t from-gray-50 to-transparent"></div>
+        </div>
+    </section>
+
+    <!-- Logo Cloud -->
+    <div class="bg-white py-12">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <p class="text-center text-sm font-semibold uppercase text-gray-500 tracking-wide mb-8">
+                Trusted by developers at
+            </p>
+            <div class="grid grid-cols-2 gap-8 md:grid-cols-6 lg:grid-cols-5">
+                <div class="col-span-1 flex justify-center items-center">
+                    <img class="h-12" src="https://upload.wikimedia.org/wikipedia/commons/thumb/a/a7/React-icon.svg/1280px-React-icon.svg.png" alt="React">
+                </div>
+                <div class="col-span-1 flex justify-center items-center">
+                    <img class="h-8" src="https://upload.wikimedia.org/wikipedia/commons/thumb/d/db/Npm-logo.svg/1280px-Npm-logo.svg.png" alt="npm">
+                </div>
+                <div class="col-span-1 flex justify-center items-center">
+                    <img class="h-10" src="https://upload.wikimedia.org/wikipedia/commons/thumb/9/9a/Laravel.svg/1200px-Laravel.svg.png" alt="Laravel">
+                </div>
+                <div class="col-span-1 flex justify-center items-center">
+                    <img class="h-10" src="https://upload.wikimedia.org/wikipedia/commons/thumb/9/95/Vue.js_Logo_2.svg/1200px-Vue.js_Logo_2.svg.png" alt="Vue">
+                </div>
+                <div class="col-span-1 flex justify-center items-center">
+                    <img class="h-10" src="https://upload.wikimedia.org/wikipedia/commons/thumb/d/d5/Tailwind_CSS_Logo.svg/1024px-Tailwind_CSS_Logo.svg.png" alt="Tailwind CSS">
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Features Section -->
+    <section id="features" class="py-20 bg-gray-50">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="text-center mb-16">
+                <span class="inline-block px-3 py-1 text-sm font-semibold text-blue-600 bg-blue-100 rounded-full mb-4">Features</span>
+                <h2 class="text-4xl font-bold text-gray-900 mb-4">AI-Powered Git Automation</h2>
+                <p class="text-xl text-gray-600 max-w-3xl mx-auto">
+                    Everything you need to streamline your development workflow
+                </p>
+            </div>
+            
+            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+                <!-- Feature 1 -->
+                <div class="feature-card bg-white p-8 shadow-md hover:shadow-xl">
+                    <div class="w-14 h-14 bg-blue-50 rounded-xl flex items-center justify-center mb-6">
+                        <i class="fas fa-comment-dots text-2xl text-blue-600"></i>
+                    </div>
+                    <h3 class="text-xl font-semibold text-gray-900 mb-3">Natural Language Interface</h3>
+                    <p class="text-gray-600 mb-4">
+                        Interact with Git using plain English. No need to remember complex commands or syntax.
+                    </p>
+                    <ul class="space-y-2 text-sm text-gray-500">
+                        <li class="flex items-start">
+                            <i class="fas fa-check-circle text-green-500 mt-1 mr-2"></i>
+                            <span>Understands context and intent</span>
+                        </li>
+                        <li class="flex items-start">
+                            <i class="fas fa-check-circle text-green-500 mt-1 mr-2"></i>
+                            <span>Supports conversational commands</span>
+                        </li>
+                        <li class="flex items-start">
+                            <i class="fas fa-check-circle text-green-500 mt-1 mr-2"></i>
+                            <span>Provides intelligent suggestions</span>
+                        </li>
+                    </ul>
+                </div>
+
+                <!-- Feature 2 -->
+                <div class="feature-card bg-white p-8 shadow-md hover:shadow-xl">
+                    <div class="w-14 h-14 bg-purple-50 rounded-xl flex items-center justify-center mb-6">
+                        <i class="fas fa-brain text-2xl text-purple-600"></i>
+                    </div>
+                    <h3 class="text-xl font-semibold text-gray-900 mb-3">Smart Automation</h3>
+                    <p class="text-gray-600 mb-4">
+                        Automate complex Git workflows with AI-powered decision making.
+                    </p>
+                    <ul class="space-y-2 text-sm text-gray-500">
+                        <li class="flex items-start">
+                            <i class="fas fa-check-circle text-green-500 mt-1 mr-2"></i>
+                            <span>Automated commit messages</span>
+                        </li>
+                        <li class="flex items-start">
+                            <i class="fas fa-check-circle text-green-500 mt-1 mr-2"></i>
+                            <span>Intelligent branch management</span>
+                        </li>
+                        <li class="flex items-start">
+                            <i class="fas fa-check-circle text-green-500 mt-1 mr-2"></i>
+                            <span>Smart conflict resolution</span>
+                        </li>
+                    </ul>
+                </div>
+
+                <!-- Feature 3 -->
+                <div class="feature-card bg-white p-8 shadow-md hover:shadow-xl">
+                    <div class="w-14 h-14 bg-green-50 rounded-xl flex items-center justify-center mb-6">
+                        <i class="fas fa-shield-alt text-2xl text-green-600"></i>
+                    </div>
+                    <h3 class="text-xl font-semibold text-gray-900 mb-3">Safety First</h3>
+                    <p class="text-gray-600 mb-4">
+                        Built-in protections to prevent mistakes and data loss.
+                    </p>
+                    <ul class="space-y-2 text-sm text-gray-500">
+                        <li class="flex items-start">
+                            <i class="fas fa-check-circle text-green-500 mt-1 mr-2"></i>
+                            <span>Automatic backup branches</span>
+                        </li>
+                        <li class="flex items-start">
+                            <i class="fas fa-check-circle text-green-500 mt-1 mr-2"></i>
+                            <span>Dangerous operation confirmations</span>
+                        </li>
+                        <li class="flex items-start">
+                            <i class="fas fa-check-circle text-green-500 mt-1 mr-2"></i>
+                            <span>Change preview before execution</span>
+                        </li>
+                    </ul>
+                </div>
+
+                <!-- Feature 4 -->
+                <div class="feature-card bg-white p-8 shadow-md hover:shadow-xl">
+                    <div class="w-14 h-14 bg-yellow-50 rounded-xl flex items-center justify-center mb-6">
+                        <i class="fas fa-tachometer-alt text-2xl text-yellow-600"></i>
+                    </div>
+                    <h3 class="text-xl font-semibold text-gray-900 mb-3">Workflow Acceleration</h3>
+                    <p class="text-gray-600 mb-4">
+                        Complete common tasks in seconds instead of minutes.
+                    </p>
+                    <ul class="space-y-2 text-sm text-gray-500">
+                        <li class="flex items-start">
+                            <i class="fas fa-check-circle text-green-500 mt-1 mr-2"></i>
+                            <span>One-command repository setup</span>
+                        </li>
+                        <li class="flex items-start">
+                            <i class="fas fa-check-circle text-green-500 mt-1 mr-2"></i>
+                            <span>Automated pull request creation</span>
+                        </li>
+                        <li class="flex items-start">
+                            <i class="fas fa-check-circle text-green-500 mt-1 mr-2"></i>
+                            <span>Bulk operations</span>
+                        </li>
+                    </ul>
+                </div>
+
+                <!-- Feature 5 -->
+                <div class="feature-card bg-white p-8 shadow-md hover:shadow-xl">
+                    <div class="w-14 h-14 bg-red-50 rounded-xl flex items-center justify-center mb-6">
+                        <i class="fas fa-plug text-2xl text-red-600"></i>
+                    </div>
+                    <h3 class="text-xl font-semibold text-gray-900 mb-3">Extensible Platform</h3>
+                    <p class="text-gray-600 mb-4">
+                        Connect with your favorite tools and services.
+                    </p>
+                    <ul class="space-y-2 text-sm text-gray-500">
+                        <li class="flex items-start">
+                            <i class="fas fa-check-circle text-green-500 mt-1 mr-2"></i>
+                            <span>Multiple AI provider support</span>
+                        </li>
+                        <li class="flex items-start">
+                            <i class="fas fa-check-circle text-green-500 mt-1 mr-2"></i>
+                            <span>GitHub/GitLab/Bitbucket integration</span>
+                        </li>
+                        <li class="flex items-start">
+                            <i class="fas fa-check-circle text-green-500 mt-1 mr-2"></i>
+                            <span>Plugin system for custom commands</span>
+                        </li>
+                    </ul>
+                </div>
+
+                <!-- Feature 6 -->
+                <div class="feature-card bg-white p-8 shadow-md hover:shadow-xl">
+                    <div class="w-14 h-14 bg-indigo-50 rounded-xl flex items-center justify-center mb-6">
+                        <i class="fas fa-terminal text-2xl text-indigo-600"></i>
+                    </div>
+                    <h3 class="text-xl font-semibold text-gray-900 mb-3">Developer Experience</h3>
+                    <p class="text-gray-600 mb-4">
+                        Designed by developers, for developers.
+                    </p>
+                    <ul class="space-y-2 text-sm text-gray-500">
+                        <li class="flex items-start">
+                            <i class="fas fa-check-circle text-green-500 mt-1 mr-2"></i>
+                            <span>Beautiful terminal UI</span>
+                        </li>
+                        <li class="flex items-start">
+                            <i class="fas fa-check-circle text-green-500 mt-1 mr-2"></i>
+                            <span>Interactive prompts</span>
+                        </li>
+                        <li class="flex items-start">
+                            <i class="fas fa-check-circle text-green-500 mt-1 mr-2"></i>
+                            <span>Comprehensive documentation</span>
+                        </li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Installation Section -->
+    <section id="installation" class="py-20 bg-white">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="lg:grid lg:grid-cols-12 lg:gap-8">
+                <div class="lg:col-span-5">
+                    <span class="inline-block px-3 py-1 text-sm font-semibold text-blue-600 bg-blue-100 rounded-full mb-4">Installation</span>
+                    <h2 class="text-4xl font-bold text-gray-900 mb-4">Get Started in Seconds</h2>
+                    <p class="text-xl text-gray-600 mb-8">
+                        GitBot Assistant is distributed as a global npm package for easy installation and updates.
+                    </p>
+                    
+                    <div class="space-y-6">
+                        <div class="flex items-start">
+                            <div class="flex-shrink-0 bg-blue-100 rounded-lg p-3">
+                                <i class="fas fa-check-circle text-blue-600 text-xl"></i>
+                            </div>
+                            <div class="ml-4">
+                                <h3 class="text-lg font-medium text-gray-900">Single Command Setup</h3>
+                                <p class="text-gray-600 mt-1">
+                                    Install with npm and start using immediately with zero configuration.
+                                </p>
+                            </div>
+                        </div>
+                        
+                        <div class="flex items-start">
+                            <div class="flex-shrink-0 bg-purple-100 rounded-lg p-3">
+                                <i class="fas fa-sync-alt text-purple-600 text-xl"></i>
+                            </div>
+                            <div class="ml-4">
+                                <h3 class="text-lg font-medium text-gray-900">Automatic Updates</h3>
+                                <p class="text-gray-600 mt-1">
+                                    Get new features and improvements with simple package updates.
+                                </p>
+                            </div>
+                        </div>
+                        
+                        <div class="flex items-start">
+                            <div class="flex-shrink-0 bg-green-100 rounded-lg p-3">
+                                <i class="fas fa-desktop text-green-600 text-xl"></i>
+                            </div>
+                            <div class="ml-4">
+                                <h3 class="text-lg font-medium text-gray-900">Cross-Platform</h3>
+                                <p class="text-gray-600 mt-1">
+                                    Works on macOS, Windows, and Linux with consistent behavior.
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="mt-12 lg:mt-0 lg:col-span-7">
+                    <div class="bg-gray-900 rounded-xl shadow-lg overflow-hidden">
+                        <div class="p-6 bg-gray-800 flex items-center space-x-2">
+                            <div class="w-3 h-3 rounded-full bg-red-500"></div>
+                            <div class="w-3 h-3 rounded-full bg-yellow-500"></div>
+                            <div class="w-3 h-3 rounded-full bg-green-500"></div>
+                            <div class="text-gray-400 text-sm ml-2">terminal</div>
+                        </div>
+                        <div class="p-6">
+                            <div class="command-block">
+                                <pre class="language-bash"><code>npm install -g gitbot-assistant</code></pre>
+                            </div>
+                            
+                            <div class="mt-6">
+                                <h4 class="text-white font-medium mb-3">First-time setup:</h4>
+                                <div class="command-block">
+                                    <pre class="language-bash"><code>gitbot init
+# Follow the interactive setup wizard
+# Configure your AI provider and GitHub credentials</code></pre>
+                                </div>
+                            </div>
+                            
+                            <div class="mt-6">
+                                <h4 class="text-white font-medium mb-3">Run your first command:</h4>
+                                <div class="command-block">
+                                    <pre class="language-bash"><code>gitbot "what can you do?"</code></pre>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Usage Section -->
+    <section id="usage" class="py-20 bg-gray-50">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="text-center mb-16">
+                <span class="inline-block px-3 py-1 text-sm font-semibold text-blue-600 bg-blue-100 rounded-full mb-4">Usage</span>
+                <h2 class="text-4xl font-bold text-gray-900 mb-4">How GitBot Works</h2>
+                <p class="text-xl text-gray-600 max-w-3xl mx-auto">
+                    Transform your natural language requests into precise Git operations
+                </p>
+            </div>
+            
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-8">
+                <!-- Step 1 -->
+                <div class="bg-white p-8 rounded-xl shadow-md">
+                    <div class="flex items-center justify-center w-14 h-14 rounded-full bg-blue-100 text-blue-600 text-xl font-bold mb-6">
+                        1
+                    </div>
+                    <h3 class="text-xl font-semibold text-gray-900 mb-3">Speak Naturally</h3>
+                    <p class="text-gray-600 mb-4">
+                        Describe what you want to do in plain English. GitBot understands your intent.
+                    </p>
+                    <div class="bg-gray-50 p-4 rounded-lg">
+                        <pre class="text-sm text-gray-800">gitbot "push my changes to main"</pre>
+                    </div>
+                </div>
+                
+                <!-- Step 2 -->
+                <div class="bg-white p-8 rounded-xl shadow-md">
+                    <div class="flex items-center justify-center w-14 h-14 rounded-full bg-purple-100 text-purple-600 text-xl font-bold mb-6">
+                        2
+                    </div>
+                    <h3 class="text-xl font-semibold text-gray-900 mb-3">Interactive Confirmation</h3>
+                    <p class="text-gray-600 mb-4">
+                        GitBot explains what it will do and asks for confirmation before proceeding.
+                    </p>
+                    <div class="bg-gray-50 p-4 rounded-lg">
+                        <pre class="text-sm text-gray-800">I'll push your changes to 'main'.
+✔ Staged changes: 2 files
+✔ Commit message: "Update config"
+Proceed? (Y/n)</pre>
+                    </div>
+                </div>
+                
+                <!-- Step 3 -->
+                <div class="bg-white p-8 rounded-xl shadow-md">
+                    <div class="flex items-center justify-center w-14 h-14 rounded-full bg-green-100 text-green-600 text-xl font-bold mb-6">
+                        3
+                    </div>
+                    <h3 class="text-xl font-semibold text-gray-900 mb-3">Execution & Results</h3>
+                    <p class="text-gray-600 mb-4">
+                        GitBot executes the operation and provides clear feedback on the results.
+                    </p>
+                    <div class="bg-gray-50 p-4 rounded-lg">
+                        <pre class="text-sm text-gray-800">✓ Pushed to origin/main
+✔ Commit: a1b2c3d
+✔ Branch is up to date</pre>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Commands Section -->
+    <section id="commands" class="py-20 bg-white">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="text-center mb-16">
+                <span class="inline-block px-3 py-1 text-sm font-semibold text-blue-600 bg-blue-100 rounded-full mb-4">Commands</span>
+                <h2 class="text-4xl font-bold text-gray-900 mb-4">Complete Command Reference</h2>
+                <p class="text-xl text-gray-600 max-w-3xl mx-auto">
+                    All the commands you need to supercharge your Git workflow
+                </p>
+            </div>
+            
+            <div class="grid grid-cols-1 lg:grid-cols-2 gap-8">
+                <!-- Git Commands -->
+                <div class="bg-gray-50 p-8 rounded-xl">
+                    <div class="flex items-center mb-6">
+                        <div class="flex-shrink-0 bg-orange-100 p-3 rounded-lg">
+                            <i class="fas fa-code-branch text-orange-600 text-xl"></i>
+                        </div>
+                        <h3 class="ml-4 text-2xl font-semibold text-gray-900">Git Operations</h3>
+                    </div>
+                    
+                    <div class="space-y-6">
+                        <div>
+                            <h4 class="font-medium text-gray-900 mb-2">Commit Changes</h4>
+                            <div class="command-block bg-white p-4 rounded-lg">
+                                <pre class="language-bash"><code>gitbot "commit with message 'fix login bug'"
+gitbot "commit all changes"
+gitbot "commit only config files"</code></pre>
+                            </div>
+                        </div>
+                        
+                        <div>
+                            <h4 class="font-medium text-gray-900 mb-2">Branch Management</h4>
+                            <div class="command-block bg-white p-4 rounded-lg">
+                                <pre class="language-bash"><code>gitbot "create branch feature-auth"
+gitbot "switch to main branch"
+gitbot "delete branch old-feature"</code></pre>
+                            </div>
+                        </div>
+                        
+                        <div>
+                            <h4 class="font-medium text-gray-900 mb-2">Push/Pull</h4>
+                            <div class="command-block bg-white p-4 rounded-lg">
+                                <pre class="language-bash"><code>gitbot "push my changes"
+gitbot "pull latest updates"
+gitbot "force push to main"</code></pre>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Repository Commands -->
+                <div class="bg-gray-50 p-8 rounded-xl">
+                    <div class="flex items-center mb-6">
+                        <div class="flex-shrink-0 bg-blue-100 p-3 rounded-lg">
+                            <i class="fab fa-github text-blue-600 text-xl"></i>
+                        </div>
+                        <h3 class="ml-4 text-2xl font-semibold text-gray-900">Repository Management</h3>
+                    </div>
+                    
+                    <div class="space-y-6">
+                        <div>
+                            <h4 class="font-medium text-gray-900 mb-2">Create Repositories</h4>
+                            <div class="command-block bg-white p-4 rounded-lg">
+                                <pre class="language-bash"><code>gitbot "create repo my-project"
+gitbot "create private repo secret-project"
+gitbot "create repo with description"</code></pre>
+                            </div>
+                        </div>
+                        
+                        <div>
+                            <h4 class="font-medium text-gray-900 mb-2">List Repositories</h4>
+                            <div class="command-block bg-white p-4 rounded-lg">
+                                <pre class="language-bash"><code>gitbot "list my repos"
+gitbot "show private repos"
+gitbot "list org repos"</code></pre>
+                            </div>
+                        </div>
+                        
+                        <div>
+                            <h4 class="font-medium text-gray-900 mb-2">Pull Requests</h4>
+                            <div class="command-block bg-white p-4 rounded-lg">
+                                <pre class="language-bash"><code>gitbot "create pull request"
+gitbot "create PR from feature to main"
+gitbot "list open PRs"</code></pre>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Examples Section -->
+    <section id="examples" class="py-20 bg-gradient-to-b from-gray-50 to-white">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="text-center mb-16">
+                <span class="inline-block px-3 py-1 text-sm font-semibold text-blue-600 bg-blue-100 rounded-full mb-4">Examples</span>
+                <h2 class="text-4xl font-bold text-gray-900 mb-4">See GitBot in Action</h2>
+                <p class="text-xl text-gray-600 max-w-3xl mx-auto">
+                    Real-world examples of how GitBot can transform your workflow
+                </p>
+            </div>
+            
+            <div class="grid grid-cols-1 lg:grid-cols-2 gap-8">
+                <!-- Example 1 -->
+                <div class="bg-white rounded-xl shadow-lg overflow-hidden">
+                    <div class="p-6 bg-gray-900 text-white">
+                        <div class="flex items-center space-x-2 mb-4">
+                            <div class="w-3 h-3 rounded-full bg-red-500"></div>
+                            <div class="w-3 h-3 rounded-full bg-yellow-500"></div>
+                            <div class="w-3 h-3 rounded-full bg-green-500"></div>
+                        </div>
+                        <h3 class="text-lg font-medium">Feature Branch Workflow</h3>
+                    </div>
+                    <div class="p-6">
+                        <div class="command-block">
+                            <pre class="language-bash"><code># Create and switch to new branch
+gitbot "create branch feature-user-auth"
+
+# Make changes and commit
+gitbot "commit with message 'add user authentication'"
+
+# Push to remote and create PR
+gitbot "push and create pull request"</code></pre>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Example 2 -->
+                <div class="bg-white rounded-xl shadow-lg overflow-hidden">
+                    <div class="p-6 bg-gray-900 text-white">
+                        <div class="flex items-center space-x-2 mb-4">
+                            <div class="w-3 h-3 rounded-full bg-red-500"></div>
+                            <div class="w-3 h-3 rounded-full bg-yellow-500"></div>
+                            <div class="w-3 h-3 rounded-full bg-green-500"></div>
+                        </div>
+                        <h3 class="text-lg font-medium">Repository Setup</h3>
+                    </div>
+                    <div class="p-6">
+                        <div class="command-block">
+                            <pre class="language-bash"><code># Create new private repository
+gitbot "create private repo my-project"
+
+# Initialize with README and license
+gitbot "add readme and MIT license"
+
+# Set up CI workflow
+gitbot "add GitHub Actions workflow"</code></pre>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Example 3 -->
+                <div class="bg-white rounded-xl shadow-lg overflow-hidden">
+                    <div class="p-6 bg-gray-900 text-white">
+                        <div class="flex items-center space-x-2 mb-4">
+                            <div class="w-3 h-3 rounded-full bg-red-500"></div>
+                            <div class="w-3 h-3 rounded-full bg-yellow-500"></div>
+                            <div class="w-3 h-3 rounded-full bg-green-500"></div>
+                        </div>
+                        <h3 class="text-lg font-medium">Complex Git Operation</h3>
+                    </div>
+                    <div class="p-6">
+                        <div class="command-block">
+                            <pre class="language-bash"><code># Safely undo last commit
+gitbot "undo last commit but keep changes"
+
+# Create backup branch
+gitbot "create backup branch before merging"
+
+# Merge with conflict resolution
+gitbot "merge feature-branch with auto-resolve"</code></pre>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Example 4 -->
+                <div class="bg-white rounded-xl shadow-lg overflow-hidden">
+                    <div class="p-6 bg-gray-900 text-white">
+                        <div class="flex items-center space-x-2 mb-4">
+                            <div class="w-3 h-3 rounded-full bg-red-500"></div>
+                            <div class="w-3 h-3 rounded-full bg-yellow-500"></div>
+                            <div class="w-3 h-3 rounded-full bg-green-500"></div>
+                        </div>
+                        <h3 class="text-lg font-medium">Bulk Operations</h3>
+                    </div>
+                    <div class="p-6">
+                        <div class="command-block">
+                            <pre class="language-bash"><code># Stage multiple files
+gitbot "add all changed config files"
+
+# Commit with generated message
+gitbot "commit all with AI message"
+
+# Push to multiple remotes
+gitbot "push to origin and backup"</code></pre>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- CTA Section -->
+    <section class="gradient-bg text-white py-20">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
+            <h2 class="text-3xl font-bold mb-6">Ready to Transform Your Git Workflow?</h2>
+            <p class="text-xl mb-8 max-w-3xl mx-auto opacity-90">
+                Install GitBot Assistant today and experience the future of version control.
+            </p>
+            <div class="flex flex-col sm:flex-row justify-center gap-4">
+                <a href="#installation" class="inline-flex items-center justify-center px-8 py-3.5 text-base font-semibold text-blue-600 bg-white rounded-lg hover:bg-gray-50 transition-all duration-300 shadow-sm">
+                    <i class="fas fa-download mr-2"></i> Install Now
+                </a>
+                <a href="https://github.com/yourusername/gitbot-assistant" target="_blank" class="inline-flex items-center justify-center px-8 py-3.5 text-base font-semibold text-white border-2 border-white rounded-lg hover:bg-white hover:text-blue-600 transition-all duration-300">
+                    <i class="fab fa-github mr-2"></i> View on GitHub
+                </a>
+            </div>
+        </div>
+    </section>
+
+    <!-- Footer -->
+    <footer class="bg-gray-900 text-white py-12">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="grid grid-cols-1 md:grid-cols-4 gap-8">
+                <div>
+                    <div class="flex items-center space-x-3 mb-4">
+                        <div class="flex items-center justify-center w-10 h-10 rounded-lg bg-gradient-to-br from-blue-500 to-purple-500">
+                            <i class="fas fa-robot text-white text-xl"></i>
+                        </div>
+                        <span class="text-xl font-bold bg-gradient-to-r from-blue-400 to-purple-400 bg-clip-text text-transparent">GitBot</span>
+                    </div>
+                    <p class="text-gray-400 text-sm">
+                        AI-powered Git workflow automation for modern development teams.
+                    </p>
+                </div>
+                
+                <div>
+                    <h4 class="text-lg font-semibold mb-4">Product</h4>
+                    <ul class="space-y-2 text-gray-400">
+                        <li><a href="#features" class="hover:text-white transition duration-300">Features</a></li>
+                        <li><a href="#installation" class="hover:text-white transition duration-300">Installation</a></li>
+                        <li><a href="#usage" class="hover:text-white transition duration-300">Usage</a></li>
+                        <li><a href="#commands" class="hover:text-white transition duration-300">Commands</a></li>
+                    </ul>
+                </div>
+                
+                <div>
+                    <h4 class="text-lg font-semibold mb-4">Resources</h4>
+                    <ul class="space-y-2 text-gray-400">
+                        <li><a href="#" class="hover:text-white transition duration-300">Documentation</a></li>
+                        <li><a href="#" class="hover:text-white transition duration-300">API Reference</a></li>
+                        <li><a href="#" class="hover:text-white transition duration-300">Tutorials</a></li>
+                        <li><a href="#" class="hover:text-white transition duration-300">Blog</a></li>
+                    </ul>
+                </div>
+                
+                <div>
+                    <h4 class="text-lg font-semibold mb-4">Connect</h4>
+                    <div class="flex space-x-4 mb-4">
+                        <a href="#" class="text-gray-400 hover:text-white transition duration-300">
+                            <i class="fab fa-github text-xl"></i>
+                        </a>
+                        <a href="#" class="text-gray-400 hover:text-white transition duration-300">
+                            <i class="fab fa-twitter text-xl"></i>
+                        </a>
+                        <a href="#" class="text-gray-400 hover:text-white transition duration-300">
+                            <i class="fab fa-discord text-xl"></i>
+                        </a>
+                    </div>
+                    <p class="text-gray-400 text-sm">
+                        Subscribe to our newsletter for updates and tips.
+                    </p>
+                </div>
+            </div>
+            
+            <div class="border-t border-gray-800 mt-12 pt-8 flex flex-col md:flex-row justify-between items-center">
+                <p class="text-gray-400 text-sm mb-4 md:mb-0">
+                    &copy; 2024 GitBot Assistant. All rights reserved.
+                </p>
+                <div class="flex space-x-6">
+                    <a href="#" class="text-gray-400 hover:text-white text-sm transition duration-300">Privacy Policy</a>
+                    <a href="#" class="text-gray-400 hover:text-white text-sm transition duration-300">Terms of Service</a>
+                </div>
+            </div>
+        </div>
+    </footer>
+
+    <!-- Prism.js script -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-core.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/plugins/autoloader/prism-autoloader.min.js"></script>
+    
+    <!-- Smooth scrolling and active nav link script -->
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            // Smooth scrolling for anchor links
+            document.querySelectorAll('a[href^="#"]').forEach(anchor => {
+                anchor.addEventListener('click', function(e) {
+                    e.preventDefault();
+                    const target = document.querySelector(this.getAttribute('href'));
+                    if (target) {
+                        target.scrollIntoView({
+                            behavior: 'smooth',
+                            block: 'start'
+                        });
+                    }
+                });
+            });
+
+            // Add active class to navigation links
+            const sections = document.querySelectorAll('section[id]');
+            const navLinks = document.querySelectorAll('nav a[href^="#"]');
+            
+            window.addEventListener('scroll', () => {
+                let current = '';
+                
+                sections.forEach(section => {
+                    const sectionTop = section.offsetTop;
+                    const sectionHeight = section.clientHeight;
+                    if (window.scrollY >= (sectionTop - 200)) {
+                        current = section.getAttribute('id');
+                    }
+                });
+
+                navLinks.forEach(link => {
+                    link.classList.remove('active-nav');
+                    if (link.getAttribute('href') === `#${current}`) {
+                        link.classList.add('active-nav');
+                    }
+                });
+            });
+        });
+    </script>
+</body>
+</html>

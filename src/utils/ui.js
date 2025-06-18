@@ -50,7 +50,7 @@ class ProfessionalUI {
   /**
    * Display application header with version info
    */
-  header(title = 'GitBot Assistant', version = '') {
+  header(title = 'GitMate', version = '') {
     if (!this._interactive) return;
 
     const titleLine = ` ${title} ${version ? colors.muted(`v${version}`) : ''} `;
@@ -117,9 +117,11 @@ class ProfessionalUI {
         ? errorObj.stack 
         : errorObj.message;
       
-      // Shorten file paths for readability
-      details = details.replace(new RegExp(homedir(), 'g'), '~');
-      details = details.replace(new RegExp(process.cwd(), 'g'), '.');
+      // Shorten file paths for readability (only if details is a string)
+      if (typeof details === 'string') {
+        details = details.replace(new RegExp(homedir(), 'g'), '~');
+        details = details.replace(new RegExp(process.cwd(), 'g'), '.');
+      }
     }
 
     this._logMessage(
@@ -541,6 +543,9 @@ class ProfessionalUI {
     );
   }
 }
+
+// Export the class for use in other modules
+export { ProfessionalUI };
 
 // Singleton instance
 const UI = new ProfessionalUI();

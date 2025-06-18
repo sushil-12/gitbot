@@ -1,192 +1,332 @@
-# GitBot: AI-Powered Git & GitHub Assistant
+# GitMate 🤖
 
-GitBot is an intelligent command-line and server-based assistant designed to streamline your Git and GitHub workflows. It leverages AI (Ollama LLM) for natural language understanding and task automation, making repository management, code operations, and GitHub interactions more intuitive.
+[![npm version](https://badge.fury.io/js/gitmate.svg)](https://badge.fury.io/js/gitmate)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
-## Features
+Professional Git workflow automation powered by AI. Streamline your development process with natural language commands and intelligent automation.
 
-*   **GitHub OAuth Authentication:** Securely connect to your GitHub account.
-*   **GitHub API Integration:**
-    *   Create and list repositories.
-    *   Push code to new or existing repositories.
-    *   Manage branches and pull requests.
-    *   Handle repository permissions (future).
-*   **Natural Language Processing (NLP):** Use plain English commands via Ollama (LLaMA 3 or Mistral) to interact with Git and GitHub.
-*   **Local Git Operations:** Powered by `simple-git` for:
-    *   Initializing repositories.
-    *   Adding, committing, and pushing changes.
-    *   Pulling, merging, and rebasing.
-    *   Basic AI-assisted merge conflict suggestions (future).
-*   **Modular Architecture:** Organized into `src/` (services, controllers, utils, models), `commands/` (CLI), `ai/` (LLM logic), `routes/` (API), and `auth/` (OAuth).
-*   **Secure Token Management:** Access tokens are stored securely (e.g., using `.env` or an encrypted local store).
-*   **Logging and Error Handling:** Robust logging and error management for easier debugging.
-*   **AI-Assisted .gitignore Generation:** (Future)
-*   **Extensible Design:** Built with future support for GitLab, Gitea, and other platforms in mind.
+## ✨ Features
 
-**Bonus Features (Planned):**
+- **Natural Language Commands**: Use plain English to execute Git operations
+- **AI-Powered Commit Messages**: Generate meaningful commit messages automatically
+- **Smart Branch Management**: Create and manage branches with intelligent suggestions
+- **Repository Operations**: Create, clone, and manage GitHub repositories
+- **Intelligent Workflows**: Automate complex Git workflows with AI assistance
+- **Multiple AI Providers**: Support for OpenAI, Anthropic, and Mistral
+- **GitHub Integration**: Seamless GitHub authentication and repository management
 
-*   Automatic commit message generation from diffs.
-*   Daily commit reminders.
-*   Visual commit tree preview.
+## 🚀 Quick Start
 
-## Project Structure
-
-```
-gitbot/
-├── ai/                     # LLM logic, intent recognition
-│   └── .gitkeep
-├── auth/                   # GitHub OAuth flow (Express.js)
-│   └── .gitkeep
-├── commands/               # CLI command handlers
-│   └── .gitkeep
-├── routes/                 # API routes (if an HTTP server is exposed)
-│   └── .gitkeep
-├── src/                    # Core application logic
-│   ├── controllers/        # Request handlers, business logic
-│   │   └── .gitkeep
-│   ├── models/             # Data models/schemas
-│   │   └── .gitkeep
-│   ├── services/           # External service integrations (GitHub API, Git CLI)
-│   │   └── .gitkeep
-│   ├── utils/              # Utility functions (logging, error handling)
-│   │   └── .gitkeep
-│   ├── cli.js              # CLI entry point
-│   └── index.js            # Main application entry point (server)
-├── .env.example            # Example environment variables
-├── .gitignore              # Files and directories to ignore
-├── package.json            # Project metadata and dependencies
-└── README.md               # This file
-```
-
-## Prerequisites
-
-*   [Node.js](https://nodejs.org/) (v18.x or later recommended)
-*   [npm](https://www.npmjs.com/) (usually comes with Node.js)
-*   [Git](https://git-scm.com/)
-*   [Ollama](https://ollama.com/) installed and running with a model like LLaMA 3 or Mistral.
-
-## Setup
-
-1.  **Clone the repository (or create the project manually based on this README):**
-    ```bash
-    git clone <repository-url> # Or your manual setup
-    cd gitbot
-    ```
-
-2.  **Install dependencies:**
-    ```bash
-    npm install
-    ```
-
-3.  **Set up GitHub OAuth Application:**
-    *   Go to your GitHub [Developer settings](https://github.com/settings/developers).
-    *   Click "New OAuth App".
-    *   **Application name:** `GitBot` (or your preferred name)
-    *   **Homepage URL:** `http://localhost:3000` (or your server's URL)
-    *   **Authorization callback URL:** `http://localhost:3000/auth/github/callback`
-    *   Click "Register application".
-    *   Note the **Client ID** and **Client Secret**.
-
-4.  **Configure Environment Variables:**
-    Create a `.env` file in the project root by copying `.env.example` (which you'll create soon):
-    ```bash
-    cp .env.example .env
-    ```
-    Open `.env` and fill in the values:
-    ```env
-    NODE_ENV=development
-    PORT=3000
-
-    # GitHub OAuth App Credentials
-    GITHUB_CLIENT_ID=your_github_client_id
-    GITHUB_CLIENT_SECRET=your_github_client_secret
-    GITHUB_CALLBACK_URL=http://localhost:3000/auth/github/callback
-
-    # Ollama Configuration
-    OLLAMA_BASE_URL=http://localhost:11434 # Default Ollama API URL
-    OLLAMA_MODEL=llama3 # Or your preferred model (e.g., mistral)
-
-    # Secure storage for tokens (e.g., encryption key if using local JSON)
-    TOKEN_STORE_PATH=./data/tokens.json
-    TOKEN_ENCRYPTION_KEY=a_very_strong_and_random_secret_key_32_chars
-
-    # Logging
-    LOG_LEVEL=info
-    ```
-
-5.  **Initialize Local Data Storage (if applicable):**
-    If using a local JSON file for token storage, create the `data` directory:
-    ```bash
-    mkdir data
-    ```
-
-## Usage
-
-### Running the Server (for OAuth and potential API)
-
-The server handles the GitHub OAuth flow and may expose other API endpoints in the future.
+### Installation
 
 ```bash
-npm start
+npm install -g sushil-gitmate
 ```
 
-Or for development with auto-reloading:
+### Option 1: Quick Start (Recommended)
+
+Set your AI provider API key and start using GitMate immediately:
 
 ```bash
+# Set your AI provider (Mistral, OpenAI, or Anthropic)
+export AI_PROVIDER=mistral
+export MISTRAL_API_KEY=your_api_key_here
+
+# Start using natural language commands
+gitmate "commit my changes"
+gitmate "push to main"
+```
+
+### Option 2: Interactive Setup
+
+```bash
+gitmate init
+```
+
+This will guide you through:
+- AI provider selection (Mistral, OpenAI, or Anthropic)
+- API key configuration
+
+## 📦 Installation
+
+```bash
+npm install -g sushil-gitmate
+```
+
+## 🎯 Quick Start
+
+1. **Initialize Configuration**
+   ```bash
+   gitmate init
+   ```
+
+2. **Authenticate with GitHub**
+   ```bash
+   gitmate auth github
+   ```
+
+3. **Start Using Natural Language Commands**
+   ```bash
+   gitmate "push my changes to main"
+   gitmate "create a new branch called feature-x"
+   gitmate "commit with message 'fix bug'"
+   ```
+
+## 📖 Usage
+
+### Natural Language Commands
+
+GitMate Assistant understands natural language commands:
+
+```bash
+# Push changes
+gitmate "push my changes to main"
+gitmate "push with commit message 'update feature'"
+gitmate "force push to main"
+
+# Branch management
+gitmate "create a new branch called feature-x"
+gitmate "switch to main branch"
+gitmate "list all branches"
+
+# Commit operations
+gitmate "commit with message 'fix bug'"
+gitmate "commit all changes"
+gitmate "revert last commit"
+
+# Repository management
+gitmate "create a new private repository called my-project"
+gitmate "list my repositories"
+```
+
+### Traditional Commands
+
+You can also use traditional command syntax:
+
+```bash
+# Repository management
+gitmate repo create my-project --private
+gitmate repo list --type=owner
+
+# Git operations
+gitmate git status
+gitmate git add .
+gitmate git commit -m "update"
+
+# AI-powered features
+gitmate generate-commit-message
+gitmate generate-gitignore "Node.js project with TypeScript"
+gitmate switch-ai-provider anthropic
+```
+
+## ⚙️ Configuration
+
+### Initial Setup
+
+Run the initialization command to set up your configuration:
+
+```bash
+gitmate init
+```
+
+This will guide you through:
+- AI provider selection (Mistral, OpenAI, or Anthropic)
+- API key configuration
+- GitHub authentication setup
+
+### Configuration Management
+
+```bash
+# View current configuration
+gitmate config --show
+
+# Reset configuration
+gitmate config --reset
+
+# Update AI provider
+gitmate config --ai-provider openai
+gitmate config --ai-provider anthropic
+
+# Update API key
+gitmate config --api-key YOUR_API_KEY
+```
+
+## 🔧 Commands Reference
+
+### Core Commands
+
+| Command | Description |
+|---------|-------------|
+| `gitmate init` | Initialize GitMate configuration |
+| `gitmate config [options]` | Manage configuration settings |
+| `gitmate auth <provider>` | Authenticate with external services |
+| `gitmate logout` | Clear stored authentication tokens |
+
+### Repository Commands
+
+| Command | Description |
+|---------|-------------|
+| `gitmate repo create <name>` | Create a new GitHub repository |
+| `gitmate repo list` | List your GitHub repositories |
+| `gitmate repo create <name> --private` | Create a private repository |
+| `gitmate repo create <name> --description "desc"` | Create repository with description |
+
+### Git Operations
+
+| Command | Description |
+|---------|-------------|
+| `gitmate git status` | Show Git status |
+| `gitmate git add <files>` | Stage files |
+| `gitmate git commit -m "message"` | Commit changes |
+| `gitmate git push` | Push changes |
+
+### AI-Powered Features
+
+| Command | Description |
+|---------|-------------|
+| `gitmate generate-commit-message` | Generate commit message from changes |
+| `gitmate generate-gitignore <description>` | Generate .gitignore file |
+| `gitmate switch-ai-provider <provider>` | Switch between AI providers |
+
+## 💡 Examples
+
+### Complete Development Workflow
+
+```bash
+# 1. Create a new feature branch
+gitmate "create a new branch called feature-user-auth"
+
+# 2. Make changes and commit
+gitmate "commit with message 'add user authentication'"
+
+# 3. Push changes
+gitmate "push my changes to feature-user-auth"
+
+# 4. Create pull request
+gitmate "create merge request from feature-user-auth to main"
+```
+
+### Repository Creation
+
+```bash
+# Create a new private repository
+gitmate "create a new private repository called my-secret-project"
+
+# Create with description
+gitmate repo create my-project --description "My awesome project"
+```
+
+### Advanced Operations
+
+```bash
+# Force push with backup
+gitmate "force push to main with backup branch creation"
+
+# Generate commit message from diff
+gitmate generate-commit-message
+
+# Generate .gitignore for specific project
+gitmate generate-gitignore "React TypeScript project with Vite"
+```
+
+## 🔐 Authentication
+
+### GitHub Authentication
+
+1. Run the authentication command:
+   ```bash
+   gitmate auth github
+   ```
+
+2. Follow the browser prompts to authorize GitMate Assistant
+
+3. Your GitHub token will be securely stored for future use
+
+### AI Provider Setup
+
+You'll need an API key from either OpenAI or Anthropic:
+
+- **OpenAI**: Get your API key from [OpenAI Platform](https://platform.openai.com/api-keys)
+- **Anthropic**: Get your API key from [Anthropic Console](https://console.anthropic.com/)
+
+## 🛠️ Development
+
+### Prerequisites
+
+- Node.js 18+
+- Git
+- GitHub Account
+- AI Provider API Key
+
+### Local Development
+
+```bash
+# Clone the repository
+git clone https://github.com/yourusername/gitmate.git
+cd gitmate
+
+# Install dependencies
+npm install
+
+# Link for local development
+npm link
+
+# Run in development mode
 npm run dev
 ```
 
-The server will typically run on `http://localhost:3000`.
+### Testing
 
-### Using the CLI
+```bash
+# Run tests
+npm test
 
-The CLI allows you to interact with GitBot using commands or natural language.
+# Run linting
+npm run lint
 
-1.  **Authenticate (if not already done via server):**
-    The first time you use a command requiring GitHub access, you might be prompted to authenticate. This usually involves visiting a URL in your browser.
+# Format code
+npm run format
+```
 
-2.  **Example CLI Commands (Conceptual):**
-    ```bash
-    # Using direct commands
-    node src/cli.js repo create my-new-repo --private
-    node src/cli.js repo list
-    node src/cli.js push "Initial commit"
+## 📁 Project Structure
 
-    # Using natural language (powered by Ollama)
-    node src/cli.js "create a new private repository named 'my-project'"
-    node src/cli.js "list all my repositories"
-    node src/cli.js "push my current changes with message 'feat: add login page'"
-    node src/cli.js "create a new branch called 'feature/user-auth'"
-    ```
+```
+gitmate/
+├── bin/
+│   └── gitmate.js          # CLI entry point
+├── src/
+│   ├── services/          # Core services
+│   ├── utils/             # Utility functions
+│   └── server/            # Authentication server
+├── commands/              # Command handlers
+├── docs/                  # Documentation
+└── package.json
+```
 
-### Authentication Flow
+## 🤝 Contributing
 
-1.  When a GitHub action is required, the bot will check for a valid access token.
-2.  If no token exists or it's invalid, the user will be directed to the GitHub authorization URL (either via CLI link or browser redirect if using the server).
-3.  User authorizes the GitBot application on GitHub.
-4.  GitHub redirects the user to the `GITHUB_CALLBACK_URL` (`/auth/github/callback`).
-5.  The server at this callback URL receives an authorization code.
-6.  The server exchanges this code for an access token with GitHub.
-7.  The access token is securely stored (e.g., in an encrypted local JSON file or `.env` for simplicity, though `.env` is less secure for user-specific tokens).
+1. Fork the repository
+2. Create a feature branch (`git checkout -b feature/amazing-feature`)
+3. Commit your changes (`git commit -m 'Add amazing feature'`)
+4. Push to the branch (`git push origin feature/amazing-feature`)
+5. Open a Pull Request
 
-## Development
+## 📄 License
 
-*   **Linting & Formatting:** (To be configured - e.g., ESLint, Prettier)
-*   **Testing:** (To be configured - e.g., Jest, Mocha)
+This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
 
-## Key Technologies
+## 🆘 Support
 
-*   **Node.js:** Runtime environment.
-*   **Express.js:** Web framework for OAuth and API routes.
-*   **simple-git:** For local Git operations.
-*   **axios:** For making HTTP requests to GitHub API and Ollama.
-*   **dotenv:** For managing environment variables.
-*   **winston:** For logging.
-*   **Ollama (LLaMA 3 / Mistral):** For natural language processing and AI features.
+- **Documentation**: [Full Documentation](https://github.com/yourusername/gitmate/wiki)
+- **Issues**: [GitHub Issues](https://github.com/yourusername/gitmate/issues)
+- **Discussions**: [GitHub Discussions](https://github.com/yourusername/gitmate/discussions)
 
-## Contributing
+## 🙏 Acknowledgments
 
-Contributions are welcome! Please open an issue or submit a pull request.
+- Built with ❤️ for the developer community
+- Powered by OpenAI GPT and Anthropic Claude
+- Inspired by the need for better Git workflow automation
 
-## License
+---
 
-This project is licensed under the ISC License. See the `LICENSE` file for details (you'll need to create this file if you want a specific license).
+**Made with ❤️ by [Your Name]**

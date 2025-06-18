@@ -309,6 +309,24 @@ export async function handleNlpCommand(query) {
   const aiReady = await aiService.checkStatus();
   if (!aiReady) {
     console.error("AI service is not available. Please check your AI provider setup.");
+    
+    // Check if we have any environment variables set
+    const hasEnvConfig = process.env.MISTRAL_API_KEY || process.env.OPENAI_API_KEY || process.env.ANTHROPIC_API_KEY;
+    
+    if (!hasEnvConfig) {
+      console.log("\nTo set up GitMate, you have two options:");
+      console.log("\nOption 1 - Environment Variables (Recommended):");
+      console.log("  export AI_PROVIDER=mistral");
+      console.log("  export MISTRAL_API_KEY=your_api_key_here");
+      console.log("  # Then run: gitmate \"your command\"");
+      
+      console.log("\nOption 2 - Interactive Setup:");
+      console.log("  gitmate init");
+      console.log("  # This will guide you through configuration");
+    } else {
+      console.log("\nConfiguration issue detected. Please check your API keys.");
+    }
+    
     logger.error("AI service not ready, aborting NLP command.", { service: serviceName });
     return;
   }
@@ -805,6 +823,24 @@ export async function handleGenerateGitignore(projectDescription) {
     const aiReady = await aiService.checkStatus();
     if (!aiReady) {
         console.error("AI service is not available. Please check your AI provider setup.");
+        
+        // Check if we have any environment variables set
+        const hasEnvConfig = process.env.MISTRAL_API_KEY || process.env.OPENAI_API_KEY || process.env.ANTHROPIC_API_KEY;
+        
+        if (!hasEnvConfig) {
+            console.log("\nTo set up GitMate, you have two options:");
+            console.log("\nOption 1 - Environment Variables (Recommended):");
+            console.log("  export AI_PROVIDER=mistral");
+            console.log("  export MISTRAL_API_KEY=your_api_key_here");
+            console.log("  # Then run: gitmate \"your command\"");
+            
+            console.log("\nOption 2 - Interactive Setup:");
+            console.log("  gitmate init");
+            console.log("  # This will guide you through configuration");
+        } else {
+            console.log("\nConfiguration issue detected. Please check your API keys.");
+        }
+        
         return;
     }
 
@@ -829,6 +865,24 @@ export async function handleGenerateCommitMessage(directoryPath = '.') {
     const aiReady = await aiService.checkStatus();
     if (!aiReady) {
         console.error("AI service is not available. Please check your AI provider setup.");
+        
+        // Check if we have any environment variables set
+        const hasEnvConfig = process.env.MISTRAL_API_KEY || process.env.OPENAI_API_KEY || process.env.ANTHROPIC_API_KEY;
+        
+        if (!hasEnvConfig) {
+            console.log("\nTo set up GitMate, you have two options:");
+            console.log("\nOption 1 - Environment Variables (Recommended):");
+            console.log("  export AI_PROVIDER=mistral");
+            console.log("  export MISTRAL_API_KEY=your_api_key_here");
+            console.log("  # Then run: gitmate \"your command\"");
+            
+            console.log("\nOption 2 - Interactive Setup:");
+            console.log("  gitmate init");
+            console.log("  # This will guide you through configuration");
+        } else {
+            console.log("\nConfiguration issue detected. Please check your API keys.");
+        }
+        
         return;
     }
 
@@ -1200,7 +1254,7 @@ function displayChangesSummary(diff) {
 
 async function createBackupBranch(currentBranch) {
   const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
-  const backupBranchName = `gitbot-backup-with-${timestamp}`;
+  const backupBranchName = `gitmate-backup-with-${timestamp}`;
   
   try {
     await gitService.createAndCheckoutBranch(backupBranchName, '.');
