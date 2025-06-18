@@ -282,29 +282,24 @@ export async function startAuthServer() {
     // Get rate limit info for user feedback
     const rateLimitInfo = await credentialManager.getRateLimitInfo();
     
-    // Instead of starting a local server, provide instructions for manual setup
+    // Use hosted authentication URL
+    const authUrl = process.env.GITMATE_AUTH_URL || 'https://your-gitmate-auth.vercel.app/auth/github';
+    
     UI.info('GitHub Authentication', 
-      'GitMate uses pre-configured GitHub OAuth credentials.\n\n' +
-      'To authenticate with GitHub:\n' +
-      '1. Go to GitHub Settings > Developer settings > Personal access tokens\n' +
-      '2. Generate a new token with "repo" and "user" scopes\n' +
-      '3. Set the token as an environment variable:\n' +
-      '   export GITHUB_TOKEN=your_token_here\n\n' +
-      'Or use Git credential storage:\n' +
-      '   git config --global credential.helper store\n\n' +
+      'Opening browser for GitHub authentication...\n\n' +
+      'This will redirect you to GitHub to authorize GitMate.\n' +
       'Rate limit: ' + rateLimitInfo.count + '/' + rateLimitInfo.maxRequests + ' requests per hour'
     );
 
-    console.log('\n📋 Alternative Authentication Methods:');
-    console.log('1. Personal Access Token (recommended)');
-    console.log('2. SSH key authentication');
-    console.log('3. Git credential storage');
-    console.log('4. HTTPS with stored credentials');
-    
-    console.log('\n🔗 GitHub Token Setup:');
-    console.log('https://github.com/settings/tokens');
-    
-    return null;
+    // Open browser for authentication
+    try {
+      const open = (await import('open')).default;
+      await open(authUrl);
+    } catch (error) {
+      UI.warning('Could not open browser automatically', `Please visit: ${authUrl}`);
+    }
+
+    return { authUrl };
   } catch (error) {
     logger.error('Failed to start auth server:', error);
     UI.error('Authentication Error', error.message);

@@ -54,9 +54,9 @@ async function getAnthropicClient() {
 
 async function getMistralClient() {
   if (!mistralClient) {
-    const apiKey = await configManager.getAPIKey();
+    const apiKey = process.env.MISTRAL_API_KEY || await configManager.getAPIKey();
     if (!apiKey) {
-      throw new Error('Mistral API key not configured. Run "gitmate init" to set up your configuration.');
+      throw new Error('Mistral API key not configured. Please set MISTRAL_API_KEY environment variable or run "gitmate init" to set up your configuration.');
     }
     
     // For Mistral, we'll use a simple HTTP client since there might not be an official SDK

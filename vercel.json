@@ -1,0 +1,14 @@
+{
+  "version": 2,
+  "functions": {
+    "api/auth.js": {
+      "runtime": "nodejs18.x"
+    }
+  },
+  "routes": [
+    {
+      "src": "/auth/(.*)",
+      "dest": "/api/auth.js"
+    }
+  ]
+} 
