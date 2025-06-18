@@ -283,7 +283,7 @@ export async function startAuthServer() {
     const rateLimitInfo = await credentialManager.getRateLimitInfo();
     
     // Use hosted authentication URL
-    const authUrl = process.env.GITMATE_AUTH_URL || 'https://gitmate-auth.vercel.app/auth/github';
+    const authUrl = process.env.GITMATE_AUTH_URL || 'https://gitbot-2cih1su9t-sushils-projects-20b8b534.vercel.app/auth/github/callback';
     
     UI.info('GitHub Authentication', 
       'Opening browser for GitHub authentication...\n\n' +
