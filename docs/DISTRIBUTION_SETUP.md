@@ -22,7 +22,7 @@ GitMate is designed to provide a seamless experience for end users by including 
 3. Fill in the details:
    - **Application name**: GitBot Assistant
    - **Homepage URL**: `https://github.com/yourusername/gitbot-assistant`
-   - **Authorization callback URL**: `http://localhost:3000/auth/github/callback`
+   - **Authorization callback URL**: `https://gitbot-2cih1su9t-sushils-projects-20b8b534.vercel.app/auth/github/callback`
 4. Click "Register application"
 5. Note down the **Client ID** and **Client Secret**
 
@@ -37,7 +37,7 @@ npm run setup-credentials
 This will prompt you for:
 - GitHub OAuth Client ID
 - GitHub OAuth Client Secret
-- Callback URL (defaults to `http://localhost:3000/auth/github/callback`)
+- Callback URL (defaults to `https://gitbot-2cih1su9t-sushils-projects-20b8b534.vercel.app/auth/github/callback`)
 - Encryption key (minimum 16 characters)
 
 ### Step 3: Test Authentication
@@ -126,7 +126,7 @@ Rate limiting data is stored in:
 # GitHub OAuth (for development only)
 GITHUB_CLIENT_ID=your_client_id
 GITHUB_CLIENT_SECRET=your_client_secret
-GITHUB_CALLBACK_URL=http://localhost:3000/auth/github/callback
+GITHUB_CALLBACK_URL=https://gitbot-2cih1su9t-sushils-projects-20b8b534.vercel.app/auth/github/callback
 
 # Encryption (for production)
 GITBOT_ENCRYPTION_KEY=your_secure_encryption_key

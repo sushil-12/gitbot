@@ -54,35 +54,21 @@ async function getAnthropicClient() {
 
 async function getMistralClient() {
   if (!mistralClient) {
-    const apiKey = process.env.MISTRAL_API_KEY || await configManager.getAPIKey();
-    if (!apiKey) {
-      throw new Error('Mistral API key not configured. Please set MISTRAL_API_KEY environment variable or run "gitmate init" to set up your configuration.');
-    }
-    
-    // For Mistral, we'll use a simple HTTP client since there might not be an official SDK
+    // Use the Vercel proxy endpoint
+    const mistralProxyUrl = process.env.MISTRAL_PROXY_URL || 'https://gitbot-2cih1su9t-sushils-projects-20b8b534.vercel.app/api/mistral';
     mistralClient = {
-      apiKey,
       async chat(messages, options = {}) {
-        const response = await fetch('https://api.mistral.ai/v1/chat/completions', {
+        const response = await fetch(mistralProxyUrl, {
           method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${apiKey}`
-          },
-          body: JSON.stringify({
-            model: options.model || 'mistral-large-latest',
-            messages,
-            max_tokens: options.max_tokens || 1000,
-            temperature: options.temperature || 0.7
-          })
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ messages, options })
         });
-        
         if (!response.ok) {
-          throw new Error(`Mistral API error: ${response.status} ${response.statusText}`);
+          throw new Error(`Mistral Proxy error: ${response.status} ${await response.text()}`);
         }
-        
         const data = await response.json();
-        return data.choices[0].message.content;
+        // Adapt to the expected return value
+        return data.choices?.[0]?.message?.content || data.choices?.[0]?.text || data;
       }
     };
   }

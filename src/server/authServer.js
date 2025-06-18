@@ -71,7 +71,7 @@ export class AuthServer {
     passport.use(new GitHubStrategy({
       clientID: credentials.clientId,
       clientSecret: credentials.clientSecret,
-      callbackURL: credentials.callbackUrl || 'http://localhost:3000/auth/github/callback'
+      callbackURL: credentials.callbackUrl || 'https://gitbot-2cih1su9t-sushils-projects-20b8b534.vercel.app/auth/github/callback'
     }, (accessToken, refreshToken, profile, done) => {
       // Store user profile and tokens
       const user = {

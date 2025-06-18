@@ -26,7 +26,7 @@ MISTRAL_REQUEST_TIMEOUT=120000
 # GitHub OAuth Configuration (for development)
 GITHUB_CLIENT_ID=your_github_client_id
 GITHUB_CLIENT_SECRET=your_github_client_secret
-GITHUB_CALLBACK_URL=http://localhost:3000/auth/github/callback
+GITHUB_CALLBACK_URL=https://gitbot-2cih1su9t-sushils-projects-20b8b534.vercel.app/auth/github/callback
 
 # Server Configuration
 PORT=3000

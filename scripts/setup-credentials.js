@@ -13,7 +13,7 @@ async function setupCredentials() {
     console.log('\nThis script will help you set up GitHub OAuth credentials for distribution.\n');
     console.log('⚠️  IMPORTANT: These credentials will be encrypted and distributed with your tool.\n');
     console.log('Make sure your GitHub OAuth app is configured with:');
-    console.log('• Authorization callback URL: http://localhost:3000/auth/github/callback');
+    console.log('• Authorization callback URL: https://gitbot-2cih1su9t-sushils-projects-20b8b534.vercel.app/auth/github/callback');
     console.log('• Required scopes: user, repo\n');
 
     const answers = await inquirer.prompt([
@@ -32,8 +32,8 @@ async function setupCredentials() {
       {
         type: 'input',
         name: 'callbackUrl',
-        message: 'Callback URL (default: http://localhost:3000/auth/github/callback):',
-        default: 'http://localhost:3000/auth/github/callback'
+        message: 'Callback URL (default: https://gitbot-2cih1su9t-sushils-projects-20b8b534.vercel.app/auth/github/callback):',
+        default: 'https://gitbot-2cih1su9t-sushils-projects-20b8b534.vercel.app/auth/github/callback'
       },
       {
         type: 'password',

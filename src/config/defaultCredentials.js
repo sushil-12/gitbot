@@ -35,7 +35,7 @@ export function getCredentialsForUser() {
     return {
       clientId: process.env.GITHUB_CLIENT_ID || "your_github_client_id",
       clientSecret: process.env.GITHUB_CLIENT_SECRET || "your_github_client_secret", 
-      callbackUrl: process.env.GITHUB_CALLBACK_URL || "http://localhost:3000/auth/github/callback"
+      callbackUrl: process.env.GITHUB_CALLBACK_URL || "https://gitbot-2cih1su9t-sushils-projects-20b8b534.vercel.app/auth/github/callback"
     };
   }
 } 
