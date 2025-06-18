@@ -4,6 +4,7 @@ import path from 'path';
 import fs from 'fs/promises';
 import { getToken } from '../utils/tokenManager.js'; // Added
 import { getUserProfile } from './githubService.js'; // Added
+import axios from 'axios';
 
 const serviceName = 'GitService';
 
@@ -81,9 +82,10 @@ export async function commitChanges(message, directoryPath = '.', authorName, au
  * @param {string} branchName - The name of the branch to push.
  * @param {string} directoryPath - The path to the Git repository.
  * @param {boolean} setUpstream - Whether to set the upstream branch (`-u` or `--set-upstream`).
+ * @param {boolean} force - Whether to force push (`-f` or `--force`).
  * @returns {Promise<void>}
  */
-export async function pushChanges(remoteName = 'origin', branchName, directoryPath = '.', setUpstream = false) {
+export async function pushChanges(remoteName = 'origin', branchName, directoryPath = '.', setUpstream = false, force = false) {
   const git = simpleGit(directoryPath);
   const currentBranch = branchName || (await git.branchLocal()).current;
   if (!currentBranch) {
@@ -92,9 +94,11 @@ export async function pushChanges(remoteName = 'origin', branchName, directoryPa
     throw err;
   }
   try {
-    const options = setUpstream ? ['--set-upstream'] : [];
+    const options = [];
+    if (setUpstream) options.push('--set-upstream');
+    if (force) options.push('--force');
     await git.push(remoteName, currentBranch, options);
-    logger.info(`Pushed ${currentBranch} to ${remoteName}`, { service: serviceName, path: directoryPath });
+    logger.info(`Pushed ${currentBranch} to ${remoteName}${force ? ' (force)' : ''}`, { service: serviceName, path: directoryPath });
   } catch (error) {
     logger.error(`Error pushing ${currentBranch} to ${remoteName}:`, { message: error.message, stack: error.stack, service: serviceName });
     throw error;
@@ -434,6 +438,45 @@ export async function getRemoteInfo(directoryPath = '.') {
     return `${owner}/${repo}`;
   } catch (error) {
     logger.error('Error getting remote info:', { message: error.message, stack: error.stack, service: serviceName });
+    throw error;
+  }
+}
+
+/**
+ * Sets the default branch for a repository.
+ * @param {string} branchName - The name of the branch to set as default.
+ * @param {string} directoryPath - The path to the Git repository.
+ * @returns {Promise<void>}
+ */
+export async function setDefaultBranch(branchName, directoryPath = '.') {
+  const git = simpleGit(directoryPath);
+  try {
+    // Get repository info
+    const repoInfo = await getRemoteInfo(directoryPath);
+    const [owner, repo] = repoInfo.split('/');
+
+    // Get GitHub token
+    const token = await getToken('github_access_token');
+    if (!token) {
+      throw new Error('GitHub access token not found. Please authenticate first.');
+    }
+
+    // Make API call to set default branch
+    const headers = {
+      'Authorization': `token ${token}`,
+      'Accept': 'application/vnd.github.v3+json'
+    };
+
+    const response = await axios.patch(
+      `https://api.github.com/repos/${owner}/${repo}`,
+      { default_branch: branchName },
+      { headers }
+    );
+
+    logger.info(`Set default branch to ${branchName}`, { service: serviceName, path: directoryPath });
+    return response.data;
+  } catch (error) {
+    logger.error(`Error setting default branch to ${branchName}:`, { message: error.message, stack: error.stack, service: serviceName });
     throw error;
   }
 }

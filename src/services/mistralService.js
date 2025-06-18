@@ -6,10 +6,27 @@ dotenv.config();
 
 const MISTRAL_API_KEY = process.env.MISTRAL_API_KEY;
 const MISTRAL_API_URL = 'https://api.mistral.ai/v1';
-const MISTRAL_MODEL = process.env.MISTRAL_MODEL || 'mistral-small'; // Default model
-const MISTRAL_REQUEST_TIMEOUT = parseInt(process.env.MISTRAL_REQUEST_TIMEOUT, 10) || 120000; // 2 minutes default
+const MISTRAL_MODEL = process.env.MISTRAL_MODEL || 'mistral-small';
+const MISTRAL_REQUEST_TIMEOUT = parseInt(process.env.MISTRAL_REQUEST_TIMEOUT, 10) || 120000;
+const MISTRAL_MAX_RETRIES = parseInt(process.env.MISTRAL_MAX_RETRIES, 10) || 2;
+const MISTRAL_RETRY_DELAY = parseInt(process.env.MISTRAL_RETRY_DELAY, 10) || 1000;
 
 const serviceName = 'MistralService';
+
+// Default templates
+const DEFAULT_GITIGNORE = `# Default gitignore
+*.log
+*.tmp
+*.swp
+.DS_Store
+.idea/
+.vscode/
+node_modules/
+dist/
+build/
+.env
+*.env.local
+`;
 
 /**
  * Checks if the Mistral API is accessible and the API key is valid.
@@ -18,7 +35,7 @@ const serviceName = 'MistralService';
 export async function checkMistralStatus() {
   try {
     if (!MISTRAL_API_KEY) {
-      logger.error('Mistral API key is not configured.', { service: serviceName });
+      logger.technical.error('Mistral API key is not configured.', { service: serviceName });
       return false;
     }
 
@@ -34,17 +51,17 @@ export async function checkMistralStatus() {
     const modelExists = models.some(m => m.id === MISTRAL_MODEL);
 
     if (modelExists) {
-      logger.info(`Mistral model '${MISTRAL_MODEL}' is available.`, { service: serviceName });
+      logger.technical.info(`Mistral model '${MISTRAL_MODEL}' is available.`, { service: serviceName });
       return true;
     } else {
-      logger.warn(`Mistral model '${MISTRAL_MODEL}' not found. Available models: ${models.map(m => m.id).join(', ')}`, { service: serviceName });
+      logger.technical.warn(`Mistral model '${MISTRAL_MODEL}' not found. Available models: ${models.map(m => m.id).join(', ')}`, { service: serviceName });
       return false;
     }
   } catch (error) {
     if (error.response?.status === 401) {
-      logger.error('Invalid Mistral API key.', { service: serviceName });
+      logger.technical.error('Invalid Mistral API key.', { service: serviceName });
     } else {
-      logger.error('Error checking Mistral API status:', {
+      logger.technical.error('Error checking Mistral API status:', {
         message: error.message,
         status: error.response?.status,
         service: serviceName
@@ -56,22 +73,36 @@ export async function checkMistralStatus() {
 
 /**
  * Sends a prompt to the Mistral LLM and gets a response.
- * @param {string} prompt - The prompt to send to the LLM.
+ * @param {string|Array} prompt - The prompt to send to the LLM (string or message array).
  * @param {string} systemMessage - (Optional) A system message to guide the LLM's behavior.
  * @param {object} options - (Optional) Additional options for the Mistral API.
  * @returns {Promise<string|null>} The LLM's response content, or null if an error occurs.
  */
 export async function generateResponse(prompt, systemMessage = null, options = {}) {
-  if (!prompt || typeof prompt !== 'string' || prompt.trim() === '') {
-    logger.error('Prompt cannot be empty.', { service: serviceName });
+  let messages = [];
+  
+  // Handle different input types
+  if (Array.isArray(prompt)) {
+    // If prompt is already an array of messages, use it directly
+    messages = prompt;
+  } else if (typeof prompt === 'string') {
+    // If prompt is a string, create messages array
+    if (systemMessage) {
+      messages.push({ role: 'system', content: systemMessage });
+    }
+    messages.push({ role: 'user', content: prompt });
+  } else {
+    logger.technical.error('Invalid prompt type. Expected string or array.', { 
+      promptType: typeof prompt, 
+      service: serviceName 
+    });
     return null;
   }
 
-  const messages = [];
-  if (systemMessage) {
-    messages.push({ role: 'system', content: systemMessage });
+  if (messages.length === 0) {
+    logger.technical.error('No messages to send.', { service: serviceName });
+    return null;
   }
-  messages.push({ role: 'user', content: prompt });
 
   const requestBody = {
     model: MISTRAL_MODEL,
@@ -82,8 +113,11 @@ export async function generateResponse(prompt, systemMessage = null, options = {
     stream: false
   };
 
-  logger.info(`Sending prompt to Mistral model '${MISTRAL_MODEL}'. Prompt: "${prompt.substring(0, 100)}..."`, { service: serviceName });
-  logger.debug('Mistral request body:', { requestBody, service: serviceName });
+  logger.technical.debug(`Sending to Mistral`, { 
+    messageCount: messages.length,
+    firstMessage: messages[0]?.content?.substring(0, 50) + '...',
+    service: serviceName 
+  });
 
   try {
     const response = await axios.post(`${MISTRAL_API_URL}/chat/completions`, requestBody, {
@@ -95,15 +129,19 @@ export async function generateResponse(prompt, systemMessage = null, options = {
     });
 
     if (response.data && response.data.choices && response.data.choices[0]?.message?.content) {
-      logger.info('Received response from Mistral.', { service: serviceName });
-      logger.debug('Mistral raw response data:', { responseData: response.data, service: serviceName });
-      return response.data.choices[0].message.content.trim();
+      const content = response.data.choices[0].message.content.trim();
+      logger.technical.debug(`Received Mistral response`, { 
+        length: content.length,
+        truncated: content.substring(0, 100) + '...',
+        service: serviceName 
+      });
+      return content;
     } else {
-      logger.error('Invalid or empty response from Mistral.', { responseData: response.data, service: serviceName });
+      logger.technical.error('Invalid or empty response from Mistral.', { responseData: response.data, service: serviceName });
       return null;
     }
   } catch (error) {
-    logger.error('Error communicating with Mistral API:', {
+    logger.technical.error('Error communicating with Mistral API:', {
       message: error.message,
       status: error.response?.status,
       data: error.response?.data,
@@ -114,130 +152,216 @@ export async function generateResponse(prompt, systemMessage = null, options = {
   }
 }
 
-/**
- * Parses a natural language query to identify intent and entities for Git/GitHub actions.
- * @param {string} naturalLanguageQuery - The user's query in plain English.
- * @returns {Promise<object|null>} An object representing the parsed intent and entities, or null.
- */
 export async function parseIntent(naturalLanguageQuery) {
-  const systemPrompt = `
-You are an expert at interpreting natural language commands for Git and GitHub operations.
+  const systemPrompt = `You are an expert at interpreting natural language commands for Git and GitHub operations.
 Your task is to identify the user's intent and extract relevant entities.
-Respond ONLY with a JSON object containing "intent" and "entities".
-If an entity is not present, do not include it in the entities object.
-For boolean entities like 'private', use true/false.
-If the intent is unclear or cannot be mapped to a defined action, respond with intent: "unknown".
+Respond ONLY with a valid JSON object containing "intent" and "entities" fields.
+Do not include any explanations, markdown, or additional text.
 
-Possible intents and their typical entities:
-- create_repo: Create a new repository.
-  - entities: repo_name (string), description (string), private (boolean, default false)
-- list_repos: List user's repositories.
-  - entities: visibility (string: "all", "owner", "public", "private", "member"), sort_by (string: "created", "updated", "pushed", "full_name"), direction (string: "asc", "desc")
-- push_changes: Push local changes to a remote repository.
-  - entities: commit_message (string), branch (string), remote (string, default "origin")
-- git_init: Initialize a new Git repository locally.
-  - entities: (none)
-- git_add: Stage changes for commit.
-  - entities: files (string or array of strings, default "." for all changes)
-- git_commit: Commit staged changes locally.
-  - entities: commit_message (string)
-- git_status: Show the working tree status.
-  - entities: (none)
-- git_revert_last_commit: Revert the last commit.
-  - entities: no_edit (boolean, default false)
-`;
+Important rules:
+- If the user mentions "push", "push changes", "push code", etc., the intent is ALWAYS "push_changes"
+- If no branch is specified for push_changes, use "current" (we'll determine the actual branch later)
+- If no remote is specified, use "origin"
+- If the user mentions "backup branch creation" or "with backup", set create_backup: true
+- Do not interpret "backup" as a branch name unless explicitly stated as "branch called backup"
+- Be intelligent and make reasonable assumptions for incomplete requests
 
-  const prompt = `User query: "${naturalLanguageQuery}"\n\nJSON response:`;
+Available intents:
+- push_changes: Push local changes to a remote repository
+- create_repo: Create a new repository
+- list_repos: List user's repositories
+- git_init: Initialize a new Git repository
+- git_add: Stage changes for commit
+- git_commit: Commit staged changes
+- git_status: Show working tree status
+- git_revert_last_commit: Revert the last commit
+
+Entity examples for push_changes:
+- commit_message (string): The commit message to use
+- branch (string): The branch to push to (use "current" if not specified)
+- remote (string): The remote to push to (default: origin)
+- force (boolean): Whether to force push
+- create_backup (boolean): Whether to create a backup branch
+- set_as_default (boolean): Whether to set as default branch
+
+Example responses:
+"push my changes" → {"intent": "push_changes", "entities": {"branch": "current"}}
+"push code please" → {"intent": "push_changes", "entities": {"branch": "current"}}
+"push to main" → {"intent": "push_changes", "entities": {"branch": "main"}}
+"push code with commit message called final changes with backup branch creation" → {"intent": "push_changes", "entities": {"commit_message": "final changes", "create_backup": true, "branch": "current"}}
+"force push to main" → {"intent": "push_changes", "entities": {"branch": "main", "force": true}}`;
+
+  const prompt = `Parse this user query: "${naturalLanguageQuery}"
+
+JSON response:`;
 
   try {
-    logger.info(`Parsing intent for query: "${naturalLanguageQuery}"`, { service: serviceName });
-    const responseText = await generateResponse(prompt, systemPrompt, { temperature: 0.2 });
+    logger.technical.debug(`Parsing intent for query: "${naturalLanguageQuery}"`, { service: serviceName });
+    const responseText = await generateResponse(prompt, systemPrompt, { temperature: 0.1 });
 
     if (!responseText) {
-      logger.error('No response from LLM for intent parsing.', { service: serviceName });
+      logger.technical.error('No response from LLM for intent parsing.', { service: serviceName });
       return { intent: 'unknown', entities: { error: 'LLM did not respond' } };
     }
 
     try {
-      const jsonMatch = responseText.match(/\{[\s\S]*\}/);
-      const jsonResponse = jsonMatch ? JSON.parse(jsonMatch[0]) : JSON.parse(responseText);
-      logger.info('Successfully parsed intent.', { intent: jsonResponse.intent, entities: jsonResponse.entities, service: serviceName });
+      // Clean the response - remove any markdown formatting
+      let cleanResponse = responseText.trim();
+      if (cleanResponse.startsWith('```json')) {
+        cleanResponse = cleanResponse.replace(/```json\n?/, '').replace(/```\n?/, '');
+      }
+      if (cleanResponse.startsWith('```')) {
+        cleanResponse = cleanResponse.replace(/```\n?/, '').replace(/```\n?/, '');
+      }
+
+      const jsonResponse = JSON.parse(cleanResponse);
+      
+      // Validate the response
+      if (!jsonResponse.intent || typeof jsonResponse.intent !== 'string') {
+        throw new Error('Invalid intent in response');
+      }
+
+      // Normalize entities
+      jsonResponse.entities = jsonResponse.entities || {};
+
+      // Special handling for backup branch creation
+      if (naturalLanguageQuery.toLowerCase().includes('backup branch creation') || 
+          naturalLanguageQuery.toLowerCase().includes('with backup')) {
+        jsonResponse.entities.create_backup = true;
+      }
+
+      // Remove backup from branch name if it was incorrectly parsed
+      if (jsonResponse.entities.branch === 'backup' && 
+          (naturalLanguageQuery.toLowerCase().includes('backup branch creation') || 
+           naturalLanguageQuery.toLowerCase().includes('with backup'))) {
+        delete jsonResponse.entities.branch;
+      }
+
+      // Ensure push_changes has a branch (default to current if not specified)
+      if (jsonResponse.intent === 'push_changes' && !jsonResponse.entities.branch) {
+        jsonResponse.entities.branch = 'current';
+      }
+
+      logger.technical.info('Successfully parsed intent.', { 
+        intent: jsonResponse.intent, 
+        entities: jsonResponse.entities, 
+        service: serviceName 
+      });
+      
       return jsonResponse;
     } catch (parseError) {
-      logger.error('Failed to parse JSON response from LLM:', {
+      logger.technical.error('Failed to parse JSON response from LLM:', {
         responseText,
         error: parseError.message,
         service: serviceName
       });
+      
+      // Fallback parsing for common patterns
+      const lowerQuery = naturalLanguageQuery.toLowerCase();
+      if (lowerQuery.includes('push')) {
+        return {
+          intent: 'push_changes',
+          entities: {
+            branch: 'current',
+            error: 'fallback_parsing',
+            original_query: naturalLanguageQuery
+          }
+        };
+      }
+      
       return { intent: 'unknown', entities: { error: 'Failed to parse LLM response', raw_response: responseText } };
     }
   } catch (error) {
-    logger.error('Error during intent parsing with Mistral:', { message: error.message, service: serviceName });
+    logger.technical.error('Error during intent parsing with Mistral:', { message: error.message, service: serviceName });
+    
+    // Fallback parsing for common patterns
+    const lowerQuery = naturalLanguageQuery.toLowerCase();
+    if (lowerQuery.includes('push')) {
+      return {
+        intent: 'push_changes',
+        entities: {
+          branch: 'current',
+          error: 'fallback_parsing',
+          original_query: naturalLanguageQuery
+        }
+      };
+    }
+    
     return { intent: 'unknown', entities: { error: error.message } };
   }
 }
 
-/**
- * Generates a .gitignore file content based on project type or keywords.
- * @param {string} projectDescription - e.g., "Node.js, React, Python Django"
- * @returns {Promise<string|null>} The generated .gitignore content or null.
- */
 export async function generateGitignore(projectDescription) {
-  const systemPrompt = `
-You are an expert at generating .gitignore files.
-Based on the provided project description or keywords, generate a comprehensive .gitignore file.
-Include common patterns for operating systems, IDEs, dependency directories, log files, and build outputs relevant to the technologies mentioned.
-Respond ONLY with the content of the .gitignore file. Do not include any other text, explanations, or markdown formatting.
-`;
+  const systemPrompt = `Generate a comprehensive .gitignore for the described technologies.
+Include:
+- Language-specific patterns
+- IDE/editor files
+- Dependency directories
+- Build outputs
+- Environment files
 
-  const prompt = `Project description: "${projectDescription}"\n\n.gitignore content:`;
+Return ONLY the .gitignore content with no additional text.`;
 
-  try {
-    logger.info(`Generating .gitignore for: "${projectDescription}"`, { service: serviceName });
-    const gitignoreContent = await generateResponse(prompt, systemPrompt, { temperature: 0.3 });
-    if (gitignoreContent) {
-      logger.info('.gitignore content generated successfully.', { service: serviceName });
-      return gitignoreContent;
-    }
-    logger.warn('LLM did not return content for .gitignore generation.', { service: serviceName });
-    return null;
-  } catch (error) {
-    logger.error('Error generating .gitignore with Mistral:', { message: error.message, service: serviceName });
-    return null;
-  }
+  const prompt = `Technologies: ${projectDescription}`;
+
+  const response = await generateResponse(prompt, systemPrompt, {
+    temperature: 0.3,
+    max_tokens: 1024
+  });
+
+  return response || DEFAULT_GITIGNORE;
 }
 
-/**
- * Generates a commit message based on code diff.
- * @param {string} diffOutput - The output of 'git diff'.
- * @returns {Promise<string|null>} A suggested commit message or null.
- */
 export async function generateCommitMessage(diffOutput) {
-  if (!diffOutput || diffOutput.trim() === '') {
-    logger.info('Diff output is empty, cannot generate commit message.', { service: serviceName });
-    return "chore: no changes detected";
+  if (!diffOutput?.trim()) {
+    return 'chore: no changes detected';
   }
 
-  const systemPrompt = `
-You are an expert at writing concise and informative Git commit messages based on code diffs.
-Follow conventional commit guidelines (e.g., "feat: ...", "fix: ...", "docs: ...", "style: ...", "refactor: ...", "perf: ...", "test: ...", "chore: ...").
-The commit message should be a single line, ideally 50 characters or less, but no more than 72 characters.
-Do not include any explanations or surrounding text, only the commit message itself.
-`;
+  const systemPrompt = `Generate a conventional commit message from this diff.
+Rules:
+1. Use standard prefix (feat, fix, docs, style, refactor, perf, test, chore)
+2. Keep subject line under 50 chars
+3. Only return the message (no explanations)
+4. Focus on significant changes`;
 
-  const prompt = `Code diff:\n\`\`\`diff\n${diffOutput}\n\`\`\`\n\nSuggested commit message:`;
+  const prompt = `Diff:\n\`\`\`diff\n${diffOutput.substring(0, 2000)}\n\`\`\``;
 
-  try {
-    logger.info('Generating commit message from diff...', { service: serviceName });
-    const commitMessage = await generateResponse(prompt, systemPrompt, { temperature: 0.5 });
-    if (commitMessage) {
-      logger.info(`Commit message generated: "${commitMessage}"`, { service: serviceName });
-      return commitMessage.replace(/^["']|["']$/g, '');
+  const response = await generateResponse(prompt, systemPrompt, {
+    temperature: 0.5,
+    max_tokens: 100
+  });
+
+  return cleanCommitMessage(response) || 'fix: code changes';
+}
+
+// Helper functions
+function createErrorResponse(message) {
+  return {
+    intent: 'error',
+    entities: {
+      error: message,
+      suggested_actions: [
+        "push to [branch]",
+        "commit with message '[message]'",
+        "create branch [name]"
+      ]
     }
-    logger.warn('LLM did not return content for commit message generation.', { service: serviceName });
-    return null;
-  } catch (error) {
-    logger.error('Error generating commit message with Mistral:', { message: error.message, service: serviceName });
-    return null;
-  }
-} 
+  };
+}
+
+function cleanCommitMessage(message) {
+  if (!message) return null;
+  return message
+    .replace(/^["']|["']$/g, '')
+    .replace(/\n/g, ' ')
+    .trim()
+    .substring(0, 72);
+}
+
+export default {
+  checkMistralStatus,
+  generateResponse,
+  parseIntent,
+  generateGitignore,
+  generateCommitMessage
+};

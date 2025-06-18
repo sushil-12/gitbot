@@ -1,93 +1,131 @@
 import winston from 'winston';
-import dotenv from 'dotenv';
+import chalk from 'chalk';
 
-dotenv.config();
+const NODE_ENV = process.env.NODE_ENV || 'development';
+const LOG_LEVEL = process.env.LOG_LEVEL || (NODE_ENV === 'production' ? 'error' : 'debug');
 
-const { combine, timestamp, printf, colorize, align, json } = winston.format;
+// Custom format for development
+const developmentFormat = winston.format.combine(
+  winston.format.timestamp({ format: 'HH:mm:ss' }),
+  winston.format.errors({ stack: true }),
+  winston.format.printf(({ timestamp, level, message, service, ...meta }) => {
+    const serviceTag = service ? chalk.cyan(`[${service}]`) : '';
+    const levelColor = {
+      error: chalk.red,
+      warn: chalk.yellow,
+      info: chalk.blue,
+      debug: chalk.gray,
+      verbose: chalk.magenta
+    }[level] || chalk.white;
+    
+    const metaStr = Object.keys(meta).length > 0 
+      ? chalk.gray(` ${JSON.stringify(meta)}`) 
+      : '';
+    
+    return `${chalk.gray(timestamp)} ${levelColor(level.toUpperCase())} ${serviceTag} ${message}${metaStr}`;
+  })
+);
 
-const logLevels = {
-  fatal: 0,
-  error: 1,
-  warn: 2,
-  info: 3,
-  http: 4,
-  debug: 5,
-  trace: 6,
-};
+// Clean format for production
+const productionFormat = winston.format.combine(
+  winston.format.timestamp(),
+  winston.format.errors({ stack: true }),
+  winston.format.json()
+);
 
-const customFormat = printf(({ level, message, timestamp, service, ...metadata }) => {
-  let msg = `${timestamp} [${service || 'Application'}] ${level}: ${message}`;
-  if (metadata && Object.keys(metadata).length > 0) {
-    // Only stringify if metadata is not already a string and has keys
-    if (typeof metadata === 'object' && Object.keys(metadata).length > 0) {
-        // Check for Error instances and extract stack
-        if (metadata.stack && metadata.message) {
-             msg += `\nStack: ${metadata.stack}`;
-        } else {
-            try {
-                msg += ` ${JSON.stringify(metadata, null, 2)}`;
-            } catch (e) {
-                // Fallback for circular structures or other stringify errors
-                msg += ` [UnserializableMetadata]`;
-            }
-        }
-    } else if (typeof metadata === 'string' && metadata.trim() !== '') {
-        msg += ` ${metadata}`;
-    }
-  }
-  return msg;
+// Console transport with environment-specific formatting
+const consoleTransport = new winston.transports.Console({
+  format: NODE_ENV === 'production' ? productionFormat : developmentFormat,
+  level: LOG_LEVEL
 });
 
-const transportsList = [
-  new winston.transports.Console({
-    level: process.env.LOG_LEVEL || 'info',
-    format: combine(
-      colorize(),
-      timestamp({ format: 'YYYY-MM-DD HH:mm:ss' }),
-      align(),
-      customFormat
-    ),
-  }),
-];
-
-if (process.env.NODE_ENV === 'production' || process.env.LOG_FILE_PATH) {
-  transportsList.push(
+// File transport for production
+const fileTransports = [];
+if (NODE_ENV === 'production') {
+  fileTransports.push(
     new winston.transports.File({
-      filename: process.env.LOG_FILE_PATH || 'logs/app.log',
-      level: process.env.LOG_LEVEL || 'info',
-      format: combine(timestamp(), json()),
+      filename: 'logs/error.log',
+      level: 'error',
+      format: productionFormat,
       maxsize: 5242880, // 5MB
-      maxFiles: 5,
+      maxFiles: 5
+    }),
+    new winston.transports.File({
+      filename: 'logs/combined.log',
+      format: productionFormat,
+      maxsize: 5242880, // 5MB
+      maxFiles: 5
     })
   );
-  if (process.env.LOG_ERROR_FILE_PATH) {
-    transportsList.push(
-      new winston.transports.File({
-        filename: process.env.LOG_ERROR_FILE_PATH || 'logs/error.log',
-        level: 'error',
-        format: combine(timestamp(), json()),
-        maxsize: 5242880, // 5MB
-        maxFiles: 5,
-      })
-    );
-  }
 }
 
+// Create logger instance
 const logger = winston.createLogger({
-  levels: logLevels,
-  format: combine(
-    timestamp({ format: 'YYYY-MM-DD HH:mm:ss' }),
-    customFormat
-  ),
-  transports: transportsList,
-  exitOnError: false, // do not exit on handled exceptions
+  level: LOG_LEVEL,
+  transports: [consoleTransport, ...fileTransports],
+  exitOnError: false
 });
 
-// Stream for morgan (HTTP request logging)
-logger.stream = {
-  write: (message) => {
-    logger.http(message.trim());
+// User-friendly logging methods
+const userLogger = {
+  // Success messages for users
+  success: (message, options = {}) => {
+    if (NODE_ENV === 'development') {
+      logger.info(`✅ ${message}`, { ...options, type: 'success' });
+    }
+    console.log(chalk.green(`✅ ${message}`));
   },
+
+  // Info messages for users
+  info: (message, options = {}) => {
+    if (NODE_ENV === 'development') {
+      logger.info(`ℹ️  ${message}`, { ...options, type: 'info' });
+    }
+    console.log(chalk.blue(`ℹ️  ${message}`));
+  },
+
+  // Warning messages for users
+  warn: (message, options = {}) => {
+    if (NODE_ENV === 'development') {
+      logger.warn(`⚠️  ${message}`, { ...options, type: 'warning' });
+    }
+    console.log(chalk.yellow(`⚠️  ${message}`));
+  },
+
+  // Error messages for users
+  error: (message, options = {}) => {
+    if (NODE_ENV === 'development') {
+      logger.error(`❌ ${message}`, { ...options, type: 'error' });
+    }
+    console.log(chalk.red(`❌ ${message}`));
+  },
+
+  // Progress indicators
+  progress: (message, options = {}) => {
+    if (NODE_ENV === 'development') {
+      logger.info(`🔄 ${message}`, { ...options, type: 'progress' });
+    }
+    console.log(chalk.cyan(`🔄 ${message}`));
+  },
+
+  // Debug messages (development only)
+  debug: (message, options = {}) => {
+    if (NODE_ENV === 'development') {
+      logger.debug(`🐛 ${message}`, { ...options, type: 'debug' });
+    }
+  },
+
+  // Verbose messages (development only)
+  verbose: (message, options = {}) => {
+    if (NODE_ENV === 'development') {
+      logger.verbose(`🔍 ${message}`, { ...options, type: 'verbose' });
+    }
+  },
+
+  // Technical logger for internal use
+  technical: logger
 };
 
-export default logger;
+// Export both the technical logger and user-friendly logger
+export { logger as technicalLogger, userLogger as logger };
+export default userLogger;

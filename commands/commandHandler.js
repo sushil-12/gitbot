@@ -1,4 +1,5 @@
 import logger from '../src/utils/logger.js';
+import UI from '../src/utils/ui.js';
 import * as prompter from '../src/utils/prompter.js';
 import fs from 'fs/promises';
 import path from 'path';
@@ -19,92 +20,110 @@ async function ensureAuthenticated() {
     logger.warn('User is not authenticated. Please authenticate first.', { service: serviceName });
     const port = process.env.PORT || 3000;
     const authInitiateUrl = `http://localhost:${port}/auth/github`;
-    console.log('\nAuthentication required.');
-    console.log(`Please open your browser and navigate to: ${authInitiateUrl}`);
-    console.log(`After authorizing, the application will receive the token.`);
-    console.log('Then, please re-run your command.');
-    return null; // Indicate authentication is required
+    
+    UI.error('Authentication Required', 
+      'You need to authenticate with GitHub to use this feature.');
+    UI.info('Please follow these steps:', 
+      `1. Open your browser and navigate to: ${authInitiateUrl}\n2. Authorize the application\n3. Re-run your command`);
+    
+    return null;
   }
-  return token; // Return the token if found
+  return token;
 }
 
 export async function handleRepoCommand(args) {
   const token = await ensureAuthenticated();
   if (!token) {
-    // ensureAuthenticated already printed the message
-    process.exitCode = 1; // Indicate a non-zero exit code for scripting if needed
+    process.exitCode = 1;
     return;
   }
+  
   const [subCommand, ...options] = args;
-  logger.info(`Handling 'repo' command: ${subCommand}`, { options, service: serviceName });
+  logger.debug(`Handling 'repo' command: ${subCommand}`, { options, service: serviceName });
 
   switch (subCommand) {
     case 'create': {
       const repoName = options[0];
       if (!repoName) {
-        logger.error("Repository name is required for 'repo create'.", { service: serviceName });
-        console.error("Error: Repository name is required. Usage: repo create <repo-name> [--private] [--description \"Your description\"]");
+        UI.error('Repository Name Required', 
+          'Please provide a repository name. Usage: repo create <repo-name> [--private] [--description "Your description"]');
         return;
       }
+      
       const repoOptions = {
         description: '',
         private: false,
-        auto_init: true, // Good default for new repos
+        auto_init: true,
       };
+      
       for (let i = 1; i < options.length; i++) {
         if (options[i] === '--private') {
           repoOptions.private = true;
         } else if (options[i] === '--description' && options[i + 1]) {
           repoOptions.description = options[i + 1];
-          i++; // Skip next value as it's consumed
+          i++;
         } else if (options[i] === '--no-init') {
-            repoOptions.auto_init = false;
+          repoOptions.auto_init = false;
         }
       }
+      
       try {
+        UI.progress('Creating repository...');
         const repo = await githubService.createRepository(repoName, repoOptions);
-        console.log(`Successfully created repository: ${repo.html_url}`);
+        UI.success('Repository Created Successfully', 
+          `Repository: ${repo.full_name}\nURL: ${repo.html_url}`);
         logger.info(`Repository created: ${repo.full_name}`, { url: repo.html_url, service: serviceName });
       } catch (error) {
-        console.error(`Error creating repository '${repoName}': ${error.message}`);
+        UI.error('Failed to Create Repository', error.message);
         logger.error(`Failed to create repository '${repoName}':`, { message: error.message, stack: error.stack, service: serviceName });
       }
       break;
     }
+    
     case 'list': {
-      // Example: repo list --type=owner --sort=updated --direction=desc
       const listOptions = {};
       for (let i = 0; i < options.length; i++) {
-          const [key, value] = options[i].split('=');
-          if (key && value) {
-              if (key.startsWith('--')) {
-                listOptions[key.substring(2)] = value;
-              } else {
-                listOptions[key] = value;
-              }
+        const [key, value] = options[i].split('=');
+        if (key && value) {
+          if (key.startsWith('--')) {
+            listOptions[key.substring(2)] = value;
+          } else {
+            listOptions[key] = value;
           }
+        }
       }
+      
       try {
+        UI.progress('Fetching repositories...');
         const repos = await githubService.listUserRepositories(listOptions);
+        
         if (repos.length === 0) {
-          console.log("No repositories found matching your criteria.");
+          UI.info('No repositories found', 'No repositories match your current criteria.');
         } else {
-          console.log("\nYour GitHub Repositories:");
-          repos.forEach(repo => {
-            console.log(`- ${repo.full_name} (${repo.private ? 'Private' : 'Public'}) - ${repo.html_url}`);
-            if (repo.description) console.log(`  Description: ${repo.description}`);
-            console.log(`  Last updated: ${new Date(repo.updated_at).toLocaleDateString()}`);
-          });
+          UI.section('Your GitHub Repositories', `Found ${repos.length} repository(ies)`);
+          
+          const repoData = repos.map(repo => ({
+            Name: repo.full_name,
+            Type: repo.private ? 'Private' : 'Public',
+            Updated: new Date(repo.updated_at).toLocaleDateString(),
+            URL: repo.html_url
+          }));
+          
+          UI.table(repoData);
         }
       } catch (error) {
-        console.error(`Error listing repositories: ${error.message}`);
+        UI.error('Failed to List Repositories', error.message);
         logger.error('Failed to list repositories:', { message: error.message, stack: error.stack, service: serviceName });
       }
       break;
     }
+    
     default:
-      logger.warn(`Unknown 'repo' subcommand: ${subCommand}`, { service: serviceName });
-      console.log(`Unknown 'repo' subcommand: ${subCommand}. Supported: create, list.`);
+      UI.warning('Unknown Command', `Unknown 'repo' subcommand: ${subCommand}`);
+      UI.help([
+        { name: 'create', description: 'Create a new repository', examples: ['repo create my-repo', 'repo create my-repo --private'] },
+        { name: 'list', description: 'List your repositories', examples: ['repo list', 'repo list --type=owner'] }
+      ]);
   }
 }
 
@@ -165,6 +184,120 @@ export async function handleGitCommand(args, currentWorkingDirectory = '.') {
     }
 }
 
+async function handleConfirmationFlow(parsed, maxRetries = 4) {
+  let retryCount = 0;
+  let currentParsed = parsed;
+  
+  while (retryCount < maxRetries) {
+    try {
+      // Generate confirmation message
+      const confirmationMessage = await aiService.generateConfirmation(currentParsed);
+      if (!confirmationMessage) {
+        throw new Error('Failed to generate confirmation message');
+      }
+      
+      console.log(chalk.cyan("\n" + confirmationMessage));
+      
+      // Ask for confirmation
+      const { confirmed } = await inquirer.prompt([
+        {
+          type: 'confirm',
+          name: 'confirmed',
+          message: 'Am I right?',
+          default: true
+        }
+      ]);
+      
+      if (confirmed) {
+        return currentParsed; // Return the current parsed result
+      }
+      
+      retryCount++;
+      if (retryCount < maxRetries) {
+        console.log(chalk.yellow(`\nLet me try again. Please rephrase your request (attempt ${retryCount + 1}/${maxRetries}):`));
+        const { newQuery } = await inquirer.prompt([
+          {
+            type: 'input',
+            name: 'newQuery',
+            message: 'Your request:',
+            validate: input => input.trim() !== '' || 'Please enter your request'
+          }
+        ]);
+        
+        // Parse the new query
+        const newParsed = await aiService.parseIntent(newQuery);
+        if (newParsed && newParsed.intent !== 'unknown') {
+          currentParsed = newParsed;
+        } else {
+          console.log(chalk.red("I still couldn't understand that. Let me try again."));
+        }
+      }
+    } catch (error) {
+      logger.error('Error in confirmation flow:', { 
+        message: error.message, 
+        stack: error.stack,
+        retryCount,
+        service: serviceName 
+      });
+      
+      if (retryCount < maxRetries) {
+        console.log(chalk.yellow(`\nI encountered an error. Let me try again (attempt ${retryCount + 1}/${maxRetries}):`));
+        const { newQuery } = await inquirer.prompt([
+          {
+            type: 'input',
+            name: 'newQuery',
+            message: 'Please rephrase your request:',
+            validate: input => input.trim() !== '' || 'Please enter your request'
+          }
+        ]);
+        
+        try {
+          const newParsed = await aiService.parseIntent(newQuery);
+          if (newParsed && newParsed.intent !== 'unknown') {
+            currentParsed = newParsed;
+          }
+        } catch (parseError) {
+          console.log(chalk.red("I'm still having trouble understanding. Let me try again."));
+        }
+      }
+    }
+  }
+  
+  // If we've exhausted all retries, show help
+  console.log(chalk.yellow("\nI'm having trouble understanding your request. Let me show you what I can do:"));
+  try {
+    const helpMessage = await aiService.generateCommandHelp();
+    console.log(chalk.cyan("\n" + helpMessage));
+  } catch (helpError) {
+    console.log(chalk.yellow("\nHere are some common commands you can try:"));
+    console.log(chalk.cyan(`
+1. Push changes:
+   - "push my changes to main"
+   - "push with commit message 'update feature'"
+   - "force push to main"
+
+2. Create and manage branches:
+   - "create a new branch called feature-x"
+   - "switch to main branch"
+   - "list all branches"
+
+3. Commit changes:
+   - "commit with message 'fix bug'"
+   - "commit all changes"
+   - "commit specific files"
+
+4. Pull and merge:
+   - "pull latest changes"
+   - "merge feature branch"
+   - "get updates from main"
+    `));
+  }
+  
+  console.log(chalk.blue("\nFor more detailed documentation, visit:"));
+  console.log(chalk.blue("https://github.com/yourusername/gitbot-assistant/wiki"));
+  
+  return null; // Return null to indicate failure
+}
 
 export async function handleNlpCommand(query) {
   logger.info(`Handling NLP query: "${query}"`, { service: serviceName });
@@ -181,7 +314,7 @@ export async function handleNlpCommand(query) {
   }
 
   try {
-    const parsed = await aiService.parseIntent(query);
+    let parsed = await aiService.parseIntent(query);
     if (!parsed || parsed.intent === 'unknown') {
       console.log("Sorry, I couldn't understand that command. Could you try rephrasing?");
       logger.warn('NLP intent parsing failed or returned unknown.', { query, parsedResult: parsed, service: serviceName });
@@ -192,15 +325,36 @@ export async function handleNlpCommand(query) {
       return;
     }
 
-    logger.info('NLP intent parsed successfully:', { intent: parsed.intent, entities: parsed.entities, service: serviceName });
-    console.log(`Understood intent: ${parsed.intent}`);
-    if (parsed.entities && Object.keys(parsed.entities).length > 0) {
-        console.log('With entities:', JSON.stringify(parsed.entities, null, 2));
+    // Add confirmation flow
+    const confirmedParsed = await handleConfirmationFlow(parsed);
+    if (!confirmedParsed) {
+      return; // User cancelled or failed to understand
     }
 
+    // Use the confirmed parsed result
+    parsed = confirmedParsed;
+
+    logger.info('NLP intent parsed successfully:', { intent: parsed.intent, entities: parsed.entities, service: serviceName });
+    console.log(chalk.green(`\nProceeding with: ${parsed.intent}`));
+    if (parsed.entities && Object.keys(parsed.entities).length > 0) {
+        console.log(chalk.gray('With parameters:'), JSON.stringify(parsed.entities, null, 2));
+    }
 
     // Now, map the intent and entities to actual service calls
     switch (parsed.intent) {
+      case 'error':
+        // Handle error intent with helpful suggestions
+        if (parsed.entities && parsed.entities.suggested_phrases) {
+          console.log(chalk.yellow("\nI couldn't understand your request clearly. Here are some suggestions:"));
+          parsed.entities.suggested_phrases.forEach((phrase, index) => {
+            console.log(chalk.cyan(`  ${index + 1}. ${phrase}`));
+          });
+          console.log(chalk.gray("\nTry rephrasing your request using one of these patterns."));
+        } else {
+          console.log(chalk.yellow("\nI couldn't understand your request. Please try rephrasing it."));
+        }
+        break;
+        
       case 'create_repo':
         const tokenForCreateRepo = await ensureAuthenticated();
         if (!tokenForCreateRepo) { process.exitCode = 1; return; }
@@ -318,17 +472,104 @@ export async function handleNlpCommand(query) {
             }
         }
 
+        // Check for unstaged changes and handle them before pushing
+        const hasUnstagedChanges = currentGitStatus.not_added.length > 0 || 
+                                  currentGitStatus.modified.length > 0 || 
+                                  currentGitStatus.deleted.length > 0 ||
+                                  currentGitStatus.created.length > 0;
+
+        if (hasUnstagedChanges) {
+          console.log(chalk.yellow("\nYou have unstaged changes that need to be committed before pushing:"));
+          
+          // Show unstaged files
+          if (currentGitStatus.not_added.length > 0) {
+            console.log(chalk.cyan("  Untracked files:"));
+            currentGitStatus.not_added.forEach(file => console.log(`    ${file}`));
+          }
+          if (currentGitStatus.modified.length > 0) {
+            console.log(chalk.cyan("  Modified files:"));
+            currentGitStatus.modified.forEach(file => console.log(`    ${file}`));
+          }
+          if (currentGitStatus.deleted.length > 0) {
+            console.log(chalk.cyan("  Deleted files:"));
+            currentGitStatus.deleted.forEach(file => console.log(`    ${file}`));
+          }
+          if (currentGitStatus.created.length > 0) {
+            console.log(chalk.cyan("  Created files:"));
+            currentGitStatus.created.forEach(file => console.log(`    ${file}`));
+          }
+
+          // Ask which files to add
+          const allUnstagedFiles = [
+            ...currentGitStatus.not_added.map(f => ({ name: `${f} (Untracked)`, value: f, short: f })),
+            ...currentGitStatus.modified.map(f => ({ name: `${f} (Modified)`, value: f, short: f })),
+            ...currentGitStatus.deleted.map(f => ({ name: `${f} (Deleted)`, value: f, short: f })),
+            ...currentGitStatus.created.map(f => ({ name: `${f} (Created)`, value: f, short: f }))
+          ];
+
+          const { filesToAdd } = await inquirer.prompt([
+            {
+              type: 'checkbox',
+              name: 'filesToAdd',
+              message: 'Select files to stage for commit:',
+              choices: allUnstagedFiles,
+              pageSize: 10,
+              validate: (answer) => {
+                if (answer.length < 1) {
+                  return 'You must choose at least one file to commit.';
+                }
+                return true;
+              }
+            }
+          ]);
+
+          if (filesToAdd && filesToAdd.length > 0) {
+            try {
+              await gitService.addFiles(filesToAdd, '.');
+              console.log(chalk.green(`Successfully staged: ${filesToAdd.join(', ')}`));
+              
+              // Get commit message
+              const { commitMessage } = await inquirer.prompt([
+                {
+                  type: 'input',
+                  name: 'commitMessage',
+                  message: 'Enter commit message:',
+                  validate: input => input.trim() !== '' || 'Commit message cannot be empty'
+                }
+              ]);
+
+              // Commit the changes
+              await gitService.commitChanges(commitMessage, '.');
+              console.log(chalk.green(`Successfully committed with message: "${commitMessage}"`));
+              
+              // Refresh status after commit
+              currentGitStatus = await gitService.getStatus('.');
+            } catch (error) {
+              logger.error('Failed to stage and commit files:', { message: error.message, stack: error.stack, service: serviceName });
+              console.error(`Error staging and committing files: ${error.message}`);
+              process.exitCode = 1; return;
+            }
+          } else {
+            console.log(chalk.yellow("No files selected. Push cancelled."));
+            process.exitCode = 1; return;
+          }
+        }
+
         let targetBranchName = parsed.entities?.branch;
         let currentBranchName = currentGitStatus.current;
+        const forcePush = parsed.entities?.force === true;
+        const setAsDefault = parsed.entities?.set_as_default === true;
+        const createBackup = parsed.entities?.create_backup === true;
 
-        if (!targetBranchName) {
+        // Handle "current" branch - use the actual current branch
+        if (targetBranchName === 'current' || !targetBranchName) {
             if (!currentBranchName) { // Unborn HEAD
                  logger.warn("Could not determine current branch (unborn HEAD). Defaulting to 'main'.", { service: serviceName });
                  targetBranchName = 'main'; // Default for unborn HEAD
             } else {
                 targetBranchName = currentBranchName;
             }
-            console.log(`No specific branch provided for push, will use current/default: ${targetBranchName}`);
+            console.log(`No specific branch provided for push, will use current branch: ${targetBranchName}`);
         }
         
         // Ensure target branch exists or create it
@@ -350,7 +591,6 @@ export async function handleNlpCommand(query) {
                     }
                 } else {
                     console.log(`Staying on branch '${currentBranchName}'. Push will target '${targetBranchName}' if you proceed with commit on current branch, or you can commit to '${targetBranchName}' after switching manually.`);
-                    // Potentially abort or clarify if commit should happen on current or target
                 }
             } else {
                 const createBranch = await prompter.askYesNo(`Branch '${targetBranchName}' does not exist locally. Create and switch to it?`, true);
@@ -372,6 +612,23 @@ export async function handleNlpCommand(query) {
         }
          // At this point, currentBranchName should be the branch we intend to commit to and push.
 
+        // Create backup branch before dangerous operations
+        if (createBackup || forcePush) {
+          console.log(chalk.yellow("\nCreating backup branch before push..."));
+          const backupBranch = await createBackupBranch(currentBranchName);
+          if (!backupBranch) {
+            const proceedAnyway = await prompter.askYesNo(
+              "Failed to create backup branch. Would you like to proceed with push anyway?",
+              false
+            );
+            if (!proceedAnyway) {
+              console.log("Push cancelled by user.");
+              process.exitCode = 1;
+              return;
+            }
+          }
+        }
+
         const remoteForPush = parsed.entities?.remote || 'origin';
         let targetRemoteExists = false;
         try {
@@ -384,24 +641,9 @@ export async function handleNlpCommand(query) {
         }
 
         if (!targetRemoteExists) {
-            // ... (remote setup logic - largely unchanged, so keeping it concise here for the diff)
-            // This block (lines 345-506 in original) should be preserved but reviewed for context if issues arise.
-            // For this diff, assume it's correctly placed and functions as before.
-            // The following is a placeholder for the existing remote setup logic:
             logger.warn(`Target remote '${remoteForPush}' not found.`, { path: '.', service: serviceName });
             const setupRemote = await prompter.askYesNo(`Remote "${remoteForPush}" is not configured. Would you like to set it up now?`, true);
             if (setupRemote) {
-                // ... existing remote creation/linking logic from original lines 349-501 ...
-                // This part needs to be carefully reintegrated from the original code.
-                // For brevity in this diff, I'm not reproducing all 150+ lines of it.
-                // It involves inquirer prompts and calls to githubService.createRepository and gitService.addRemote
-                // Ensure this logic is correctly placed back here.
-                // Example:
-                // const remoteAction = await prompter.askForChoice(...);
-                // if (remoteAction === 'create') { ... } else if (remoteAction === 'link') { ... }
-                // For now, let's assume it's handled and targetRemoteExists becomes true if successful.
-                // This is a critical section to get right from the original.
-                // --- BEGINNING OF COPIED REMOTE SETUP LOGIC (abbreviated) ---
                 const remoteAction = await prompter.askForChoice(
                     'How would you like to set up the remote?',
                     [
@@ -410,158 +652,47 @@ export async function handleNlpCommand(query) {
                     ]
                 );
                 if (remoteAction === 'create') {
-                    // ... full creation logic ...
-                     console.log("Remote setup for 'create' needs to be fully re-implemented here.");
-                     // This is where the original lines ~357-455 would go.
-                     // As a placeholder:
-                     // const { newRepoName, isPrivate } = await inquirer.prompt(...)
-                     // const newRepo = await githubService.createRepository(newRepoName, { private: isPrivate, ... });
-                     // await gitService.addRemote(remoteForPush, newRepo.clone_url, '.');
-                     // targetRemoteExists = true;
-                } else if (remoteAction === 'link') {
-                    // ... full linking logic ...
-                    console.log("Remote setup for 'link' needs to be fully re-implemented here.");
-                    // This is where the original lines ~456-497 would go.
-                    // As a placeholder:
-                    // const existingRepoUrl = await prompter.askForInput(...);
-                    // await gitService.addRemote(remoteForPush, existingRepoUrl, '.');
-                    // targetRemoteExists = true;
-                } else {
-                     console.log("No remote action selected. Aborting."); process.exitCode = 1; return;
-                }
-                // --- END OF COPIED REMOTE SETUP LOGIC (abbreviated) ---
-                // After successful setup, ensure targetRemoteExists is true.
-                // If setup failed or was cancelled, the function should have returned.
-            } else {
-                console.log(`Okay, remote "${remoteForPush}" is needed to push. Please configure it and try again.`);
+              const { newRepoName, isPrivate } = await inquirer.prompt([
+                { type: 'input', name: 'newRepoName', message: 'Enter name for new repository:', default: path.basename(process.cwd()) },
+                { type: 'confirm', name: 'isPrivate', message: 'Make this repository private?', default: false }
+              ]);
+              try {
+                const newRepo = await githubService.createRepository(newRepoName, { private: isPrivate });
+                await gitService.addRemote(remoteForPush, newRepo.clone_url, '.');
+                targetRemoteExists = true;
+                console.log(`Created and linked new repository: ${newRepo.html_url}`);
+              } catch (error) {
+                logger.error("Failed to create repository:", { message: error.message, service: serviceName });
+                console.error(`Failed to create repository: ${error.message}`);
                 process.exitCode = 1; return;
-            }
-        }
-
-
-        let commitMade = false;
-        currentGitStatus = await gitService.getStatus('.'); // Re-fetch status after potential branch changes
-
-        if (currentGitStatus.files.length > 0) {
-            const commitMsgForPush = parsed.entities?.commit_message;
-            let filesToCommit = [];
-
-            if (commitMsgForPush && commitMsgForPush.trim() !== "") {
-                const confirmCommit = await prompter.askYesNo(`You have uncommitted changes. Stage them and commit with message: "${commitMsgForPush}"?`, true);
-                if (confirmCommit) {
-                    const unStagedFiles = [
-                        ...currentGitStatus.not_added.map(f => ({ name: `${f} (Untracked)`, value: f, short: f })),
-                        ...currentGitStatus.modified.map(f => ({ name: `${f} (Modified)`, value: f, short: f })),
-                        ...currentGitStatus.deleted.map(f => ({ name: `${f} (Deleted)`, value: f, short: f })),
-                    ];
-                    if (unStagedFiles.length > 0) {
-                        const { selectedFiles } = await inquirer.prompt([
-                            { type: 'checkbox', name: 'selectedFiles', message: 'Select files to stage for this commit:', choices: unStagedFiles, default: unStagedFiles.map(f=>f.value) }
-                        ]);
-                        filesToCommit = selectedFiles;
-                    }
-                    
-                    if (filesToCommit.length > 0) {
-                        try {
-                            await gitService.addFiles(filesToCommit, '.');
-                            console.log(`Staged: ${filesToCommit.join(', ')}`);
-                            await gitService.commitChanges(commitMsgForPush, '.');
-                            commitMade = true;
-                        } catch (commitError) {
-                            logger.warn("Error during explicit pre-push commit:", { message: commitError.message, service: serviceName });
-                            console.warn(`Note: Could not commit with message "${commitMsgForPush}". Error: ${commitError.message}`);
-                            const continuePush = await prompter.askYesNo("Do you want to try pushing existing commits anyway?", false);
-                            if (!continuePush) { process.exitCode = 1; return; }
-                        }
-                    } else {
-                        console.log("No files selected for commit. Proceeding to push existing commits.");
-                    }
-                } else {
-                    console.log("Okay, I will not commit the current changes.");
-                }
-            } else { // No commit message in NLP, but changes exist
-                const confirmAutoCommit = await prompter.askYesNo("You have uncommitted changes. Would you like to stage and commit them now?", true);
-                if (confirmAutoCommit) {
-                    const unStagedFiles = [
-                        ...currentGitStatus.not_added.map(f => ({ name: `${f} (Untracked)`, value: f, short: f })),
-                        ...currentGitStatus.modified.map(f => ({ name: `${f} (Modified)`, value: f, short: f })),
-                        ...currentGitStatus.deleted.map(f => ({ name: `${f} (Deleted)`, value: f, short: f })),
-                    ];
-                     if (unStagedFiles.length === 0) { // Should not happen if status.files.length > 0, but safeguard
-                        console.log("No changes to stage. Proceeding to push existing commits.");
-                    } else {
-                        const { selectedFiles } = await inquirer.prompt([
-                            { type: 'checkbox', name: 'selectedFiles', message: 'Select files to stage for commit:', choices: unStagedFiles, default: unStagedFiles.map(f=>f.value) }
-                        ]);
-                        filesToCommit = selectedFiles;
-
-                        if (filesToCommit.length > 0) {
-                            const { newCommitMessage } = await inquirer.prompt([
-                                { type: 'input', name: 'newCommitMessage', message: 'Please enter a commit message:', default: "feat: auto-commit by GitBot", validate: value => value.trim() !== '' || 'Commit message cannot be empty.'}
+              }
+            } else if (remoteAction === 'link') {
+              const { existingRepoUrl } = await inquirer.prompt([
+                { type: 'input', name: 'existingRepoUrl', message: 'Enter URL of existing repository:', validate: input => input.trim() !== '' || 'Repository URL cannot be empty' }
                             ]);
                             try {
-                                await gitService.addFiles(filesToCommit, '.');
-                                console.log(`Staged: ${filesToCommit.join(', ')}`);
-                                await gitService.commitChanges(newCommitMessage, '.');
-                                commitMade = true;
-                            } catch (commitError) {
-                                logger.error("Error during auto-commit:", { message: commitError.message, service: serviceName });
-                                console.error(`Failed to commit changes: ${commitError.message}`);
-                                const continuePush = await prompter.askYesNo("Could not commit changes. Do you want to try pushing existing commits anyway?", false);
-                                if (!continuePush) { process.exitCode = 1; return; }
+                await gitService.addRemote(remoteForPush, existingRepoUrl, '.');
+                targetRemoteExists = true;
+                console.log(`Linked to existing repository: ${existingRepoUrl}`);
+              } catch (error) {
+                logger.error("Failed to link repository:", { message: error.message, service: serviceName });
+                console.error(`Failed to link repository: ${error.message}`);
+                process.exitCode = 1; return;
                             }
                         } else {
-                             console.log("No files selected for commit. Proceeding to push existing commits.");
-                        }
-                    }
-                } else {
-                    const pushExisting = await prompter.askYesNo("Okay, I will not commit the current changes. Push existing commits anyway?", true);
-                    if (!pushExisting) {
-                        console.log("Push cancelled.");
-                        process.exitCode = 1; return;
-                    }
-                }
-            }
-        }
-
-        // Check for initial commit if no commits have been made on the branch
-        try {
-            const log = await gitService.getLog('.', { maxCount: 1 });
-            if (log.total === 0 && !commitMade) { // No commits in history and no commit just made
-                console.log(`Branch '${currentBranchName}' has no commits yet.`);
-                const makeInitialCommit = await prompter.askYesNo("Would you like to make an initial commit (e.g., with a README)?", true);
-                if (makeInitialCommit) {
-                    try {
-                        // Check if README.md exists, create if not
-                        try {
-                            await fs.access('README.md');
-                        } catch (e) {
-                             await fs.writeFile('README.md', `# ${path.basename(process.cwd())}\n\nInitialized by GitBot.\n`, 'utf8');
-                             console.log("Created a new README.md for initial commit.");
-                             await gitService.addFiles('README.md', '.');
-                        }
-                        await gitService.commitChanges(`feat: initial commit for ${currentBranchName}`, '.');
-                        console.log("Initial commit created.");
-                    } catch (fsError) {
-                        logger.error("Failed to create or commit initial README", { message: fsError.message, service: serviceName });
-                        console.error("Failed to make initial commit. Please commit manually.");
+              console.log("No remote action selected. Aborting.");
                         process.exitCode = 1; return;
                     }
                 } else {
-                    console.log("Push cancelled. An initial commit is required.");
+            console.log(`Okay, remote "${remoteForPush}" is needed to push. Please configure it and try again.`);
                     process.exitCode = 1; return;
                 }
-            }
-        } catch (logError) {
-            logger.warn("Could not check commit log for initial commit, proceeding with push attempt.", {message: logError.message, service: serviceName});
         }
-        
-        // Final branch to push is currentBranchName (which should be the target branch now)
 
         // Check if branch exists on remote
         try {
             const remoteBranches = await gitService.listBranches('.', ['-r']);
-            const remoteBranchRef = `remotes/${remoteForPush}/${currentBranchName}`;
+            const remoteBranchRef = `${remoteForPush}/${currentBranchName}`;
             if (!remoteBranches.all.includes(remoteBranchRef)) {
                 const createRemoteBranch = await prompter.askYesNo(
                     `Branch '${currentBranchName}' does not exist on remote '${remoteForPush}'. Create it on the remote and push?`,
@@ -574,7 +705,6 @@ export async function handleNlpCommand(query) {
             }
         } catch (branchCheckError) {
             logger.warn(`Could not check remote branches for '${currentBranchName}'. Proceeding with push attempt.`, { message: branchCheckError.message, service: serviceName });
-            // Optionally, ask user if they want to proceed despite not being able to check
             const proceedAnyway = await prompter.askYesNo(
                 `Could not verify if branch '${currentBranchName}' exists on remote '${remoteForPush}' due to an error: ${branchCheckError.message}. Attempt to push anyway?`,
                 true
@@ -586,20 +716,51 @@ export async function handleNlpCommand(query) {
         }
 
         try {
-            console.log(`Pushing branch '${currentBranchName}' to remote '${remoteForPush}'...`);
-            await gitService.pushChanges(remoteForPush, currentBranchName, '.', true); // true for --set-upstream
+          if (forcePush) {
+            const confirmForcePush = await prompter.askYesNo(
+              `WARNING: You are about to force push branch '${currentBranchName}' to '${remoteForPush}'. This will overwrite the remote branch history. Are you sure?`,
+              false
+            );
+            if (!confirmForcePush) {
+              console.log("Force push cancelled by user.");
+              process.exitCode = 1; return;
+            }
+          }
+
+          console.log(`Pushing branch '${currentBranchName}' to remote '${remoteForPush}'${forcePush ? ' (force)' : ''}...`);
+          await gitService.pushChanges(remoteForPush, currentBranchName, '.', true, forcePush);
             console.log("Push successful.");
+
+          if (setAsDefault) {
+            const confirmSetDefault = await prompter.askYesNo(
+              `Would you like to set '${currentBranchName}' as the default branch for this repository?`,
+              true
+            );
+            if (confirmSetDefault) {
+              try {
+                await gitService.setDefaultBranch(currentBranchName, '.');
+                console.log(`Successfully set '${currentBranchName}' as the default branch.`);
+              } catch (setDefaultError) {
+                logger.error("Failed to set default branch:", { message: setDefaultError.message, service: serviceName });
+                console.error(`Failed to set default branch: ${setDefaultError.message}`);
+              }
+            }
+          }
         } catch (pushError) {
             logger.error("Error during push operation:", { message: pushError.message, service: serviceName });
             console.error(`Error pushing to ${remoteForPush}/${currentBranchName}: ${pushError.message}`);
-            // ... (existing error handling for 403 and generic push failures - lines 610-638 in original)
-            // This part should be preserved.
             if (pushError.message && (pushError.message.includes('403') || pushError.message.toLowerCase().includes('permission denied'))) {
-                // ... (403 error details) ...
-                 console.log("\nA 403 Forbidden error occurred..."); // Placeholder for original lines 611-630
+            console.log("\nA 403 Forbidden error occurred. This usually means:");
+            console.log("1. You don't have write access to the repository");
+            console.log("2. Your GitHub token has expired or is invalid");
+            console.log("3. The repository requires branch protection rules to be followed");
+            console.log("\nPlease check your permissions and try again.");
             } else {
-                // ... (generic push error advice) ...
-                console.log("\nCommon reasons for push failure..."); // Placeholder for original lines 632-638
+            console.log("\nCommon reasons for push failure:");
+            console.log("1. Remote branch has changes that you don't have locally");
+            console.log("2. You don't have permission to push to this branch");
+            console.log("3. The remote repository is not accessible");
+            console.log("\nTry pulling first or check your permissions.");
             }
         }
         break;
@@ -856,8 +1017,8 @@ async function handleMergeRequest(sourceBranch, targetBranch = 'main') {
 
     // 7. Check if source branch has been pushed to remote
     const remoteBranches = await gitService.listBranches('.', ['-r']);
-    const sourceBranchRemote = `remotes/origin/${sourceBranch}`;
-    const targetBranchRemote = `remotes/origin/${targetBranch}`;
+    const sourceBranchRemote = `origin/${sourceBranch}`;
+    const targetBranchRemote = `origin/${targetBranch}`;
 
     // Check if target branch exists on remote
     if (!remoteBranches.all.includes(targetBranchRemote)) {
@@ -963,7 +1124,6 @@ async function handleMergeRequest(sourceBranch, targetBranch = 'main') {
       logger.warn('Failed to copy to clipboard:', { error: clipboardError.message });
       console.log(chalk.yellow("\nNote: Could not copy summary to clipboard. You can copy it manually from above."));
     }
-
     // Open the URL in the default browser
     try {
       const open = await import('open');
@@ -1036,4 +1196,21 @@ function displayChangesSummary(diff) {
     console.log(chalk.yellow(`\n${file}`));
     console.log(`  ${chalk.green(`+${fileAdditions}`)} ${chalk.red(`-${fileDeletions}`)}`);
   });
+}
+
+async function createBackupBranch(currentBranch) {
+  const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
+  const backupBranchName = `gitbot-backup-with-${timestamp}`;
+  
+  try {
+    await gitService.createAndCheckoutBranch(backupBranchName, '.');
+    await gitService.pushChanges('origin', backupBranchName, '.', true);
+    console.log(chalk.green(`Created backup branch: ${backupBranchName}`));
+    await gitService.checkoutBranch(currentBranch, '.'); // Switch back to original branch
+    return backupBranchName;
+  } catch (error) {
+    logger.error('Failed to create backup branch:', { message: error.message, service: serviceName });
+    console.error(chalk.red(`Failed to create backup branch: ${error.message}`));
+    return null;
+  }
 }
