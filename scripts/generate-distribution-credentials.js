@@ -13,7 +13,7 @@ async function generateDistributionCredentials() {
     console.log('\nThis script will help you generate encrypted GitHub OAuth credentials\n');
     console.log('⚠️  IMPORTANT: These credentials will be included in the distributed package.\n');
     console.log('Make sure your GitHub OAuth app is configured with:');
-    console.log('• Authorization callback URL: https://gitbot-chi.vercel.app/auth/github/callback');
+    console.log('• Authorization callback URL: https://gitbot-jtp2.onrender.com/auth/github/callback');
     console.log('• Required scopes: user, repo\n');
 
     const answers = await inquirer.prompt([
@@ -32,8 +32,8 @@ async function generateDistributionCredentials() {
       {
         type: 'input',
         name: 'callbackUrl',
-        message: 'Callback URL (default: https://gitbot-chi.vercel.app/auth/github/callback):',
-        default: 'https://gitbot-chi.vercel.app/auth/github/callback'
+        message: 'Callback URL (default: https://gitbot-jtp2.onrender.com/auth/github/callback):',
+        default: 'https://gitbot-jtp2.onrender.com/auth/github/callback'
       },
       {
         type: 'password',
@@ -94,7 +94,7 @@ export function getCredentialsForUser() {
     return {
       clientId: process.env.GITHUB_CLIENT_ID || "your_github_client_id",
       clientSecret: process.env.GITHUB_CLIENT_SECRET || "your_github_client_secret", 
-      callbackUrl: process.env.GITHUB_CALLBACK_URL || "https://gitbot-chi.vercel.app/auth/github/callback"
+      callbackUrl: process.env.GITHUB_CALLBACK_URL || "https://gitbot-jtp2.onrender.com/auth/github/callback"
     };
   }
 }`;

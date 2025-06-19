@@ -1,5 +1,4 @@
 import inquirer from 'inquirer';
-import logger from './logger.js';
 
 const serviceName = 'Prompter';
 

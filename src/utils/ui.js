@@ -8,7 +8,6 @@ import terminalLink from 'terminal-link';
 import logSymbols from 'log-symbols';
 import cliSpinners from 'cli-spinners';
 import { homedir } from 'os';
-import path from 'path';
 
 // Environment configuration
 const IS_CI = process.env.CI === 'true';

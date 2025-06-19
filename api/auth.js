@@ -26,7 +26,7 @@ app.use(passport.session());
 function setupPassport() {
   const clientId = process.env.GITHUB_CLIENT_ID;
   const clientSecret = process.env.GITHUB_CLIENT_SECRET;
-  const callbackURL = process.env.GITHUB_CALLBACK_URL || 'https://gitbot-chi.vercel.app/auth/github/callback';
+  const callbackURL = process.env.GITHUB_CALLBACK_URL || 'https://gitbot-jtp2.onrender.com/auth/github/callback';
   
   if (!clientId || !clientSecret) {
     throw new Error('GitHub OAuth credentials not available. Please set GITHUB_CLIENT_ID and GITHUB_CLIENT_SECRET environment variables.');

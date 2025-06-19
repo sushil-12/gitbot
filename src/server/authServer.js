@@ -62,10 +62,8 @@ export class AuthServer {
     // Get credentials from environment variables
     const clientId = process.env.GITHUB_CLIENT_ID;
     const clientSecret = process.env.GITHUB_CLIENT_SECRET;
-    const callbackUrl = process.env.GITHUB_CALLBACK_URL || 'https://gitbot-chi.vercel.app/auth/github/callback';
+    const callbackUrl = process.env.GITHUB_CALLBACK_URL || 'https://gitbot-jtp2.onrender.com/auth/github/callback';
 
-    console.log(callbackUrl, clientId);
-    exit();
     if (!clientId || !clientSecret) {
       throw new Error('GitHub OAuth credentials not available. Please set GITHUB_CLIENT_ID and GITHUB_CLIENT_SECRET in your environment variables.');
     }
@@ -276,7 +274,7 @@ export class AuthServer {
 export async function startAuthServer() {
   try {
     // Use hosted authentication URL
-    const authUrl = process.env.GITMATE_AUTH_URL || 'https://gitbot-chi.vercel.app/auth/github';
+    const authUrl = process.env.GITMATE_AUTH_URL || 'https://gitbot-jtp2.onrender.com/auth/github';
     console.log(authUrl);
 
     UI.info('GitHub Authentication', 

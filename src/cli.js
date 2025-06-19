@@ -3,7 +3,7 @@ import dotenv from 'dotenv';
 import { Command, Option } from 'commander';
 import logger from './utils/logger.js';
 import * as commandHandler from '../commands/commandHandler.js';
-import { AI_PROVIDERS, aiService, getCurrentProvider } from './services/aiServiceFactory.js';
+import {  aiService, getCurrentProvider } from './services/aiServiceFactory.js';
 
 dotenv.config();
 const program = new Command();
