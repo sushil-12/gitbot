@@ -77,6 +77,39 @@ export async function commitChanges(message, directoryPath = '.', authorName, au
 }
 
 /**
+ * Ensures the 'origin' remote URL includes the GitHub token for authentication.
+ * Only updates if the remote is GitHub and does not already have the token in the URL.
+ * @param {string} directoryPath - The path to the Git repository.
+ */
+export async function ensureOriginRemoteWithToken(directoryPath = '.') {
+  const git = simpleGit(directoryPath);
+  try {
+    const remotes = await git.getRemotes(true);
+    const origin = remotes.find(r => r.name === 'origin');
+    if (!origin || !origin.refs.fetch.includes('github.com')) return;
+    // If already has token in URL, skip
+    if (/https:\/\/.+@github.com/.test(origin.refs.fetch)) return;
+    const accessToken = await getToken('github_access_token');
+    if (!accessToken) return;
+    let username = 'x-access-token';
+    try {
+      const userProfile = await getUserProfile();
+      if (userProfile && userProfile.login) username = userProfile.login;
+    } catch {}
+    // Parse owner/repo from URL
+    const urlParts = origin.refs.fetch.match(/github\.com[/:]([^/]+)\/([^/.]+)(\.git)?$/);
+    if (!urlParts || urlParts.length < 3) return;
+    const owner = urlParts[1];
+    const repo = urlParts[2];
+    const newUrl = `https://${username}:${accessToken}@github.com/${owner}/${repo}.git`;
+    await git.remote(['set-url', 'origin', newUrl]);
+    logger.info(`Updated origin remote to use token-authenticated URL for ${username}@github.com/${owner}/${repo}`);
+  } catch (err) {
+    logger.warn('Failed to update origin remote with token:', { message: err.message });
+  }
+}
+
+/**
  * Pushes committed changes to a remote repository.
  * @param {string} remoteName - The name of the remote (e.g., 'origin').
  * @param {string} branchName - The name of the branch to push.
@@ -86,6 +119,9 @@ export async function commitChanges(message, directoryPath = '.', authorName, au
  * @returns {Promise<void>}
  */
 export async function pushChanges(remoteName = 'origin', branchName, directoryPath = '.', setUpstream = false, force = false) {
+  if (remoteName === 'origin') {
+    await ensureOriginRemoteWithToken(directoryPath);
+  }
   const git = simpleGit(directoryPath);
   const currentBranch = branchName || (await git.branchLocal()).current;
   if (!currentBranch) {
