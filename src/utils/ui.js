@@ -9,6 +9,7 @@ import logSymbols from 'log-symbols';
 import cliSpinners from 'cli-spinners';
 import { homedir } from 'os';
 
+
 // Environment configuration
 const IS_CI = process.env.CI === 'true';
 const IS_TTY = process.stdout.isTTY;
@@ -89,6 +90,11 @@ class ProfessionalUI {
         width: MAX_WIDTH
       })
     );
+  }
+
+  progress(message) {
+    // Simple progress indicator (can be improved with spinners later)
+    console.log(`⏳ ${message}`);
   }
 
   // ======================
@@ -311,21 +317,58 @@ class ProfessionalUI {
       return;
     }
 
-    const headers = options.headers || Object.keys(data[0]);
+    // Remove duplicates by Name
+    const uniqueData = [];
+    const seenNames = new Set();
+    for (const row of data) {
+      if (!seenNames.has(row.Name)) {
+        uniqueData.push(row);
+        seenNames.add(row.Name);
+      }
+    }
+
+    // Enhance Type with icons and color
+    uniqueData.forEach(row => {
+      if (row.Type) {
+        if (row.Type.toLowerCase().includes('private')) {
+          row.Type = `${chalk.yellow('🔒 Private')}`;
+        } else {
+          row.Type = `${chalk.green('🌐 Public')}`;
+        }
+      }
+      // Format date
+      if (row.Updated) {
+        row.Updated = new Date(row.Updated).toLocaleDateString();
+      }
+      // Make URL clickable and colored
+      if (row.URL) {
+        let displayUrl = row.URL;
+        if (displayUrl.length > 40) {
+          displayUrl = displayUrl.slice(0, 37) + '...';
+        }
+        if (terminalLink.isSupported) {
+          row.URL = terminalLink(chalk.cyan(displayUrl), row.URL);
+        } else {
+          row.URL = chalk.cyan(displayUrl);
+        }
+      }
+    });
+
+    const headers = options.headers || Object.keys(uniqueData[0]);
     const columnWidths = headers.map(header => {
       const headerLength = header.length;
-      const maxDataLength = Math.max(...data.map(row => 
-        String(row[header] || '').length
+      const maxDataLength = Math.max(...uniqueData.map(row => 
+        String(row[header] || '').replace(/\u001b\[[0-9;]*m/g, '').length
       ));
       return Math.min(
-        Math.max(headerLength, maxDataLength, 10),
+        Math.max(headerLength, maxDataLength, 12),
         Math.floor(MAX_WIDTH / headers.length)
       );
     });
 
     // Build header row
     const headerRow = headers
-      .map((header, i) => colors.bold.blue(header.padEnd(columnWidths[i])))
+      .map((header, i) => chalk.blue.bold(header.padEnd(columnWidths[i])))
       .join(' │ ');
 
     // Build divider
@@ -334,19 +377,24 @@ class ProfessionalUI {
     );
 
     // Print table
-    console.log(colors.blue(`┌${divider}┐`));
-    console.log(colors.blue(`│ ${headerRow} │`));
-    console.log(colors.blue(`├${divider}┤`));
+    console.log(chalk.blue(`┌${divider}┐`));
+    console.log(chalk.blue(`│ ${headerRow} │`));
+    console.log(chalk.blue(`├${divider}┤`));
 
-    data.forEach(row => {
+    uniqueData.forEach(row => {
       const rowText = headers
-        .map((header, i) => 
-          String(row[header] || '').padEnd(columnWidths[i]))
+        .map((header, i) => {
+          let cell = String(row[header] || '');
+          // Pad cell, but avoid breaking color codes
+          const plainCell = cell.replace(/\u001b\[[0-9;]*m/g, '');
+          const padLength = Math.max(columnWidths[i] - plainCell.length, 0);
+          return cell + ' '.repeat(padLength);
+        })
         .join(' │ ');
-      console.log(colors.white(`│ ${rowText} │`));
+      console.log(chalk.white(`│ ${rowText} │`));
     });
 
-    console.log(colors.blue(`└${divider}┘`));
+    console.log(chalk.blue(`└${divider}┘`));
   }
 
   /**

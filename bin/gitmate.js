@@ -266,13 +266,21 @@ async function handleAuth(args) {
     case 'github': {
       // Start the auth server
       const { startAuthServer } = await import('../src/server/authServer.js');
-      const authServer = await startAuthServer();
-      
-      // If authServer is null, it means OAuth isn't configured (normal for end users)
-      if (!authServer) {
-        // Exit gracefully - the error message was already shown
-        return;
-      }
+      await startAuthServer();
+      // Prompt for token after browser is opened
+      const inquirer = (await import('inquirer')).default;
+      const { storeToken } = await import('../src/utils/tokenManager.js');
+      const { token } = await inquirer.prompt([
+        {
+          type: 'password',
+          name: 'token',
+          message: 'Paste the token you received from the browser:',
+          mask: '*',
+          validate: input => input.trim() !== '' || 'Token is required',
+        },
+      ]);
+      await storeToken('github_access_token', token.trim());
+      console.log('Authentication Complete: Your GitHub token has been saved. You are now authenticated!');
       break;
     }
       

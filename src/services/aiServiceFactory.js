@@ -16,6 +16,9 @@ let openaiClient = null;
 let anthropicClient = null;
 let mistralClient = null;
 
+// In-memory cache for prompt/response pairs (session cache)
+const aiResponseCache = new Map();
+
 export function setProvider(provider) {
   if (Object.values(AI_PROVIDERS).includes(provider)) {
     currentProvider = provider;
@@ -153,28 +156,33 @@ export const aiService = {
 
   async generateResponse(prompt, options = {}) {
     try {
+      // Check cache first
+      const cacheKey = JSON.stringify({ prompt, options });
+      if (aiResponseCache.has(cacheKey)) {
+        return aiResponseCache.get(cacheKey);
+      }
       const provider = await configManager.getAIProvider();
-      
+      let response;
       if (provider === AI_PROVIDERS.OPENAI) {
         const client = await getOpenAIClient();
-        const response = await client.chat.completions.create({
+        response = await client.chat.completions.create({
           model: options.model || 'gpt-4',
           messages: [{ role: 'user', content: prompt }],
           max_tokens: options.max_tokens || 1000,
           temperature: options.temperature || 0.7
         });
-        return response.choices[0].message.content;
+        response = response.choices[0].message.content;
       } else if (provider === AI_PROVIDERS.ANTHROPIC) {
         const client = await getAnthropicClient();
-        const response = await client.messages.create({
+        const anthropicResponse = await client.messages.create({
           model: options.model || 'claude-3-sonnet-20240229',
           max_tokens: options.max_tokens || 1000,
           messages: [{ role: 'user', content: prompt }]
         });
-        return response.content[0].text;
+        response = anthropicResponse.content[0].text;
       } else if (provider === AI_PROVIDERS.MISTRAL) {
         const client = await getMistralClient();
-        const response = await client.chat(
+        response = await client.chat(
           [{ role: 'user', content: prompt }],
           {
             model: options.model || 'mistral-large-latest',
@@ -182,11 +190,17 @@ export const aiService = {
             temperature: options.temperature || 0.7
           }
         );
-        return response;
       } else {
         throw new Error(`Unsupported AI provider: ${provider}`);
       }
+      aiResponseCache.set(cacheKey, response);
+      return response;
     } catch (error) {
+      // User-friendly error for 429
+      if (error.message && error.message.includes('429')) {
+        logger.error('AI service rate limit reached (429):', { message: error.message, service: serviceName });
+        return '⚠️ The AI service is currently overloaded or your usage limit has been reached. Please wait a few minutes and try again, or consider upgrading your service tier.';
+      }
       logger.error('AI service response generation failed:', { message: error.message, service: serviceName });
       throw error;
     }
@@ -194,6 +208,11 @@ export const aiService = {
 
   async parseIntent(query) {
     try {
+      // Check cache first
+      const cacheKey = `intent:${query}`;
+      if (aiResponseCache.has(cacheKey)) {
+        return aiResponseCache.get(cacheKey);
+      }
       const provider = await configManager.getAIProvider();
       const prompt = `Analyze this Git command and extract the intent and entities. Return a JSON object with:
 - intent: The main action (push_changes, create_branch, git_commit, etc.)
@@ -204,25 +223,28 @@ Query: "${query}"
 Return only valid JSON:`;
 
       const response = await this.generateResponse(prompt, { max_tokens: 500 });
-      
+      let parsed;
       try {
         // Handle markdown-wrapped JSON responses
         let jsonContent = response.trim();
-        
-        // Remove markdown code blocks if present
         if (jsonContent.startsWith('```json')) {
           jsonContent = jsonContent.replace(/^```json\s*/, '').replace(/\s*```$/, '');
         } else if (jsonContent.startsWith('```')) {
           jsonContent = jsonContent.replace(/^```\s*/, '').replace(/\s*```$/, '');
         }
-        
-        const parsed = JSON.parse(jsonContent);
-        return parsed;
+        parsed = JSON.parse(jsonContent);
       } catch (parseError) {
         logger.error('Failed to parse AI response as JSON:', { response, error: parseError.message, service: serviceName });
-        return { intent: 'unknown', entities: { error: 'Failed to parse response' } };
+        parsed = { intent: 'unknown', entities: { error: 'Failed to parse response' } };
       }
+      aiResponseCache.set(cacheKey, parsed);
+      return parsed;
     } catch (error) {
+      // User-friendly error for 429
+      if (error.message && error.message.includes('429')) {
+        logger.error('AI service rate limit reached (429):', { message: error.message, service: serviceName });
+        return { intent: 'error', entities: { error: '⚠️ The AI service is currently overloaded or your usage limit has been reached. Please wait a few minutes and try again, or consider upgrading your service tier.' } };
+      }
       logger.error('Intent parsing failed:', { message: error.message, service: serviceName });
       return { intent: 'unknown', entities: { error: error.message } };
     }

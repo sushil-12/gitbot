@@ -85,8 +85,8 @@ app.get('/auth/github', passport.authenticate('github', { scope: ['user', 'repo'
 app.get('/auth/github/callback', 
   passport.authenticate('github', { failureRedirect: '/auth/failure' }),
   (req, res) => {
-    const user = req.user;
-    // Send success response with token data and copy instructions
+    // const user = req.user;
+    // Send success response with NO token display
     res.send(`
       <!DOCTYPE html>
       <html>
@@ -95,18 +95,14 @@ app.get('/auth/github/callback',
         <style>
           body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; display: flex; justify-content: center; align-items: center; height: 100vh; margin: 0; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; }
           .container { text-align: center; background: rgba(255,255,255,0.1); padding: 2rem; border-radius: 10px; backdrop-filter: blur(10px); }
-          .token-box { background: #222; color: #4ade80; font-size: 1.1rem; padding: 0.7rem 1.2rem; border-radius: 6px; margin: 1rem auto; word-break: break-all; display: inline-block; }
-          .warning { color: #fbbf24; margin-top: 1rem; }
           .success { color: #4ade80; }
         </style>
       </head>
       <body>
         <div class="container">
           <h1>🎉 Authentication Successful!</h1>
-          <p class="success">Copy the token below and paste it into your terminal when prompted.</p>
-          <div class="token-box">${user.accessToken}</div>
-          <p class="warning"><b>Warning:</b> This token gives access to your GitHub account. <br>Do <b>not</b> share it with anyone.</p>
-          <p>Return to your terminal and paste the token when asked.</p>
+          <p class="success">You may now return to your terminal. Your token has been securely stored.</p>
+          <p>It is safe to close this window.</p>
         </div>
       </body>
       </html>

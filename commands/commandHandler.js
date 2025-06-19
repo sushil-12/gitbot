@@ -15,18 +15,28 @@ const serviceName = 'CommandHandler';
 let diffViewerInitialized = false;
 
 async function ensureAuthenticated() {
-  const token = await getToken('github_access_token');
+  let token = await getToken('github_access_token');
   if (!token) {
     logger.warn('User is not authenticated. Please authenticate first.', { service: serviceName });
     const port = process.env.PORT || 3000;
     const authInitiateUrl = `http://localhost:${port}/auth/github`;
-    
+
     UI.error('Authentication Required', 
       'You need to authenticate with GitHub to use this feature.');
     UI.info('Please follow these steps:', 
-      `1. Open your browser and navigate to: ${authInitiateUrl}\n2. Authorize the application\n3. Re-run your command`);
-    
-    return null;
+      `1. Open your browser and navigate to: ${authInitiateUrl}\n2. Authorize the application\n3. Paste the token below:`);
+
+    const { token: enteredToken } = await inquirer.prompt([
+      {
+        type: 'password',
+        name: 'token',
+        message: 'Paste the token you received from the browser:',
+        mask: '*',
+        validate: input => input.trim() !== '' || 'Token is required',
+      },
+    ]);
+    await storeToken('github_access_token', enteredToken.trim());
+    token = enteredToken.trim();
   }
   return token;
 }
@@ -374,6 +384,7 @@ export async function handleNlpCommand(query) {
         break;
         
       case 'create_repo':
+      case 'create_repository':
         const tokenForCreateRepo = await ensureAuthenticated();
         if (!tokenForCreateRepo) { process.exitCode = 1; return; }
         const { repo_name, description, private: isPrivate } = parsed.entities;
@@ -384,6 +395,7 @@ export async function handleNlpCommand(query) {
         await handleRepoCommand(['create', repo_name, ...(isPrivate ? ['--private'] : []), ...(description ? ['--description', description] : [])]);
         break;
       case 'list_repos':
+      case 'list_repositories':
         const tokenForListRepos = await ensureAuthenticated();
         if (!tokenForListRepos) { process.exitCode = 1; return; }
         // Convert parsed entities to options for listUserRepositories if any
@@ -1280,15 +1292,17 @@ export async function handleAuth(args) {
     case 'github': {
       // Print Render auth URL and prompt for token
       const renderAuthUrl = 'https://gitbot-jtp2.onrender.com/auth/github';
+      exit();
       UI.info('GitHub Authentication',
         `Please open the following URL in your browser to authenticate:\n\n${renderAuthUrl}\n\nAfter authenticating, you will receive a token.\nPaste the token here when prompted.`
       );
       const inquirer = (await import('inquirer')).default;
       const { token } = await inquirer.prompt([
         {
-          type: 'input',
+          type: 'password',
           name: 'token',
           message: 'Paste the token you received from the browser:',
+          mask: '*',
           validate: input => input.trim() !== '' || 'Token is required',
         },
       ]);
