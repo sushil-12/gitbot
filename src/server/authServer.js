@@ -7,7 +7,6 @@ import { dirname, join } from 'path';
 import { config } from '../config/index.js';
 import { logger } from '../utils/logger.js';
 import { ProfessionalUI } from '../utils/ui.js';
-import { credentialManager } from '../utils/credentialManager.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -60,20 +59,25 @@ export class AuthServer {
    * Setup Passport authentication
    */
   async setupPassport() {
-    // Get credentials from credential manager
-    const credentials = await credentialManager.getCredentials();
-    
-    if (!credentials || !credentials.clientId || !credentials.clientSecret) {
-      throw new Error('GitHub OAuth credentials not available. Please contact the tool developer.');
+    // Get credentials from environment variables
+    const clientId = process.env.GITHUB_CLIENT_ID;
+    const clientSecret = process.env.GITHUB_CLIENT_SECRET;
+    const callbackUrl = process.env.GITHUB_CALLBACK_URL || 'https://gitbot-chi.vercel.app/auth/github/callback';
+
+    console.log(callbackUrl, clientId);
+    exit();
+    if (!clientId || !clientSecret) {
+      throw new Error('GitHub OAuth credentials not available. Please set GITHUB_CLIENT_ID and GITHUB_CLIENT_SECRET in your environment variables.');
     }
 
     // GitHub OAuth Strategy
     passport.use(new GitHubStrategy({
-      clientID: credentials.clientId,
-      clientSecret: credentials.clientSecret,
-      callbackURL: credentials.callbackUrl || 'https://gitbot-2cih1su9t-sushils-projects-20b8b534.vercel.app/auth/github/callback'
+      clientID: clientId,
+      clientSecret: clientSecret,
+      callbackURL: callbackUrl
     }, (accessToken, refreshToken, profile, done) => {
       // Store user profile and tokens
+
       const user = {
         id: profile.id,
         username: profile.username,
@@ -271,24 +275,13 @@ export class AuthServer {
  */
 export async function startAuthServer() {
   try {
-    // Check rate limit first
-    try {
-      await credentialManager.checkRateLimit();
-    } catch (rateLimitError) {
-      UI.error('Rate Limit Exceeded', rateLimitError.message);
-      return null;
-    }
-
-    // Get rate limit info for user feedback
-    const rateLimitInfo = await credentialManager.getRateLimitInfo();
-    
     // Use hosted authentication URL
-    const authUrl = process.env.GITMATE_AUTH_URL || 'https://gitbot-2cih1su9t-sushils-projects-20b8b534.vercel.app/auth/github/callback';
-    
+    const authUrl = process.env.GITMATE_AUTH_URL || 'https://gitbot-chi.vercel.app/auth/github';
+    console.log(authUrl);
+
     UI.info('GitHub Authentication', 
       'Opening browser for GitHub authentication...\n\n' +
-      'This will redirect you to GitHub to authorize GitMate.\n' +
-      'Rate limit: ' + rateLimitInfo.count + '/' + rateLimitInfo.maxRequests + ' requests per hour'
+      'This will redirect you to GitHub to authorize GitMate.'
     );
 
     // Open browser for authentication

@@ -2,9 +2,10 @@ import express from 'express';
 import session from 'express-session';
 import passport from 'passport';
 import GitHubStrategy from 'passport-github2';
+import dotenv from 'dotenv';
 
 const app = express();
-
+dotenv.config();
 // Session configuration for serverless
 app.use(session({
   secret: process.env.SESSION_SECRET || 'gitmate-secret-key',
@@ -23,7 +24,7 @@ app.use(passport.session());
 function setupPassport() {
   const clientId = process.env.GITHUB_CLIENT_ID;
   const clientSecret = process.env.GITHUB_CLIENT_SECRET;
-  const callbackURL = process.env.GITHUB_CALLBACK_URL || 'https://your-domain.vercel.app/auth/github/callback';
+  const callbackURL = process.env.GITHUB_CALLBACK_URL || 'https://gitbot-chi.vercel.app/auth/github/callback';
   
   if (!clientId || !clientSecret) {
     throw new Error('GitHub OAuth credentials not available. Please set GITHUB_CLIENT_ID and GITHUB_CLIENT_SECRET environment variables.');

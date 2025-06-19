@@ -55,7 +55,7 @@ async function getAnthropicClient() {
 async function getMistralClient() {
   if (!mistralClient) {
     // Use the Vercel proxy endpoint
-    const mistralProxyUrl = process.env.MISTRAL_PROXY_URL || 'https://gitbot-2cih1su9t-sushils-projects-20b8b534.vercel.app/api/mistral';
+    const mistralProxyUrl = process.env.MISTRAL_PROXY_URL || 'https://gitbot-chi.vercel.app/api/mistral';
     mistralClient = {
       async chat(messages, options = {}) {
         const response = await fetch(mistralProxyUrl, {

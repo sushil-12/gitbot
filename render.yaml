@@ -1,0 +1,16 @@
+services:
+  - type: web
+    name: gitmate-auth
+    env: docker
+    plan: free
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: SESSION_SECRET
+        generateValue: true
+      - key: GITHUB_CLIENT_ID
+        sync: false
+      - key: GITHUB_CLIENT_SECRET
+        sync: false
+      - key: GITHUB_CALLBACK_URL
+        value: https://your-app.onrender.com/auth/github/callback 
