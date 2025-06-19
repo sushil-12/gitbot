@@ -3,6 +3,8 @@ import session from 'express-session';
 import passport from 'passport';
 import GitHubStrategy from 'passport-github2';
 import dotenv from 'dotenv';
+import { join, dirname } from 'path';
+import { fileURLToPath } from 'url';
 
 const app = express();
 dotenv.config();
@@ -54,6 +56,14 @@ function setupPassport() {
     done(null, user);
   });
 }
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = dirname(__filename);
+
+// Home route for health check and Render deployment
+app.get('/', (req, res) => {
+  res.sendFile(join(__dirname, 'index.html'));
+});
 
 // Health check endpoint
 app.get('/health', (req, res) => {
@@ -180,4 +190,12 @@ app.get('/auth/failure', (req, res) => {
 setupPassport();
 
 // Export for Vercel
-export default app; 
+export default app;
+
+// Start server when running locally or on Render (ESM compatible)
+if (process.env.RENDER || import.meta.url === `file://${process.argv[1]}`) {
+  const port = process.env.PORT || 3000;
+  app.listen(port, () => {
+    console.log(`Server running on port ${port}`);
+  });
+} 
