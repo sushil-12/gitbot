@@ -6,7 +6,7 @@ import path from 'path';
 import * as githubService from '../src/services/githubService.js';
 import * as gitService from '../src/services/gitService.js';
 import { aiService, AI_PROVIDERS, setProvider } from '../src/services/aiServiceFactory.js';
-import { getToken, clearAllTokens } from '../src/utils/tokenManager.js';
+import { getToken, clearAllTokens, storeToken } from '../src/utils/tokenManager.js';
 import inquirer from 'inquirer';
 import chalk from 'chalk';
 
@@ -1266,5 +1266,39 @@ async function createBackupBranch(currentBranch) {
     logger.error('Failed to create backup branch:', { message: error.message, service: serviceName });
     console.error(chalk.red(`Failed to create backup branch: ${error.message}`));
     return null;
+  }
+}
+
+export async function handleAuth(args) {
+  if (args.length === 0) {
+    UI.error('Provider Required', 'Please specify an authentication provider (e.g., github)');
+    process.exitCode = 1;
+    return;
+  }
+  const provider = args[0];
+  switch (provider.toLowerCase()) {
+    case 'github': {
+      // Print Render auth URL and prompt for token
+      const renderAuthUrl = 'https://gitbot-jtp2.onrender.com/auth/github';
+      UI.info('GitHub Authentication',
+        `Please open the following URL in your browser to authenticate:\n\n${renderAuthUrl}\n\nAfter authenticating, you will receive a token.\nPaste the token here when prompted.`
+      );
+      const inquirer = (await import('inquirer')).default;
+      const { token } = await inquirer.prompt([
+        {
+          type: 'input',
+          name: 'token',
+          message: 'Paste the token you received from the browser:',
+          validate: input => input.trim() !== '' || 'Token is required',
+        },
+      ]);
+      await storeToken('github_access_token', token.trim());
+      UI.success('Authentication Complete', 'Your GitHub token has been saved. You are now authenticated!');
+      break;
+    }
+    default:
+      UI.error('Unknown Provider', `Unknown authentication provider: ${provider}`);
+      process.exitCode = 1;
+      break;
   }
 }

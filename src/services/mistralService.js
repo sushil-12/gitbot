@@ -120,11 +120,23 @@ export async function generateResponse(prompt, systemMessage = null, options = {
   });
 
   try {
-    const response = await axios.post(`${MISTRAL_API_URL}/chat/completions`, requestBody, {
-      headers: {
-        'Authorization': `Bearer ${MISTRAL_API_KEY}`,
-        'Content-Type': 'application/json'
-      },
+    // const response = await axios.post(`${MISTRAL_API_URL}/chat/completions`, requestBody, {
+    //   headers: {
+    //     'Authorization': `Bearer ${MISTRAL_API_KEY}`,
+    //     'Content-Type': 'application/json'
+    //   },
+    //   timeout: MISTRAL_REQUEST_TIMEOUT
+    // });
+    // Instead, call the custom backend proxy
+    const response = await axios.post('/api/mistral', {
+      messages: messages,
+      options: {
+        model: MISTRAL_MODEL,
+        temperature: options.temperature || 0.7,
+        top_p: options.top_p || 0.9,
+        max_tokens: options.max_tokens || 4096
+      }
+    }, {
       timeout: MISTRAL_REQUEST_TIMEOUT
     });
 
