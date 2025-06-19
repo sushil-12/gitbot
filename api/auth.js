@@ -10,6 +10,9 @@ import fetch from 'node-fetch'; // If using Node <18, otherwise use global fetch
 
 const app = express();
 dotenv.config();
+// Add JSON body parser middleware before routes
+app.use(express.json());
+
 // Session configuration for serverless
 app.use(session({
   secret: process.env.SESSION_SECRET || 'gitmate-secret-key',
@@ -192,7 +195,7 @@ setupPassport();
 export default app;
 
 // Start server when running locally or on Render (ESM compatible)
-if (process.env.RENDER || import.meta.url === `file://${process.argv[1]}`) {
+if (process.env.RENDER || process.argv[1].endsWith('auth.js')) {
   const port = process.env.PORT || 3000;
   app.listen(port, () => {
     console.log(`Server running on port ${port}`);

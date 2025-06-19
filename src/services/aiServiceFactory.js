@@ -56,6 +56,7 @@ async function getMistralClient() {
   if (!mistralClient) {
     // Use the Vercel proxy endpoint
     const mistralProxyUrl = process.env.MISTRAL_PROXY_URL || 'https://gitbot-jtp2.onrender.com/api/mistral';
+    console.log('mistralProxyUrl', mistralProxyUrl);
     mistralClient = {
       async chat(messages, options = {}) {
         const response = await fetch(mistralProxyUrl, {
@@ -78,32 +79,38 @@ async function getMistralClient() {
 export const aiService = {
   async checkStatus() {
     try {
-      // First check if we have environment variables set
-      const hasEnvConfig = process.env.MISTRAL_API_KEY || process.env.OPENAI_API_KEY || process.env.ANTHROPIC_API_KEY;
-      
-      if (hasEnvConfig) {
-        // User has environment variables set, use them
-        const provider = process.env.AI_PROVIDER || 'mistral';
-        const apiKey = process.env.MISTRAL_API_KEY || process.env.OPENAI_API_KEY || process.env.ANTHROPIC_API_KEY;
-        
-        if (apiKey) {
-          // Test the connection
-          if (provider === AI_PROVIDERS.OPENAI) {
-            const client = new OpenAI({ apiKey });
-            await client.models.list();
-          } else if (provider === AI_PROVIDERS.ANTHROPIC) {
-            const client = new Anthropic({ apiKey });
-            await client.messages.create({
-              model: 'claude-3-sonnet-20240229',
-              max_tokens: 10,
-              messages: [{ role: 'user', content: 'Hello' }]
-            });
-          } else if (provider === AI_PROVIDERS.MISTRAL) {
-            const client = await getMistralClient();
-            await client.chat([{ role: 'user', content: 'Hello' }], { max_tokens: 10 });
-          }
-          return true;
+      // Prefer Mistral if its API key is present
+      let provider = process.env.AI_PROVIDER;
+      let apiKey = null;
+      if (process.env.MISTRAL_API_KEY) {
+        provider = 'mistral';
+        apiKey = process.env.MISTRAL_API_KEY;
+      } else if (process.env.OPENAI_API_KEY) {
+        provider = 'openai';
+        apiKey = process.env.OPENAI_API_KEY;
+      } else if (process.env.ANTHROPIC_API_KEY) {
+        provider = 'anthropic';
+        apiKey = process.env.ANTHROPIC_API_KEY;
+      } else if (process.env.AI_PROVIDER) {
+        provider = process.env.AI_PROVIDER;
+      }
+      if (apiKey) {
+        // Test the connection
+        if (provider === AI_PROVIDERS.OPENAI) {
+          const client = new OpenAI({ apiKey });
+          await client.models.list();
+        } else if (provider === AI_PROVIDERS.ANTHROPIC) {
+          const client = new Anthropic({ apiKey });
+          await client.messages.create({
+            model: 'claude-3-sonnet-20240229',
+            max_tokens: 10,
+            messages: [{ role: 'user', content: 'Hello' }]
+          });
+        } else if (provider === AI_PROVIDERS.MISTRAL) {
+          const client = await getMistralClient();
+          await client.chat([{ role: 'user', content: 'Hello' }], { max_tokens: 10 });
         }
+        return true;
       }
 
       // Check if we have local config
@@ -113,26 +120,26 @@ export const aiService = {
         return false;
       }
 
-      const provider = await configManager.getAIProvider();
-      const apiKey = await configManager.getAPIKey();
+      const configProvider = await configManager.getAIProvider();
+      const configApiKey = await configManager.getAPIKey();
       
-      if (!apiKey) {
+      if (!configApiKey) {
         logger.warn('API key not configured. Users can set AI_PROVIDER and API key environment variables or run "gitmate init" to set up.', { service: serviceName });
         return false;
       }
-
+      console.log('configProvider', configProvider);
       // Test the connection
-      if (provider === AI_PROVIDERS.OPENAI) {
+      if (configProvider === AI_PROVIDERS.OPENAI) {
         const client = await getOpenAIClient();
         await client.models.list();
-      } else if (provider === AI_PROVIDERS.ANTHROPIC) {
+      } else if (configProvider === AI_PROVIDERS.ANTHROPIC) {
         const client = await getAnthropicClient();
         await client.messages.create({
           model: 'claude-3-sonnet-20240229',
           max_tokens: 10,
           messages: [{ role: 'user', content: 'Hello' }]
         });
-      } else if (provider === AI_PROVIDERS.MISTRAL) {
+      } else if (configProvider === AI_PROVIDERS.MISTRAL) {
         const client = await getMistralClient();
         await client.chat([{ role: 'user', content: 'Hello' }], { max_tokens: 10 });
       }
