@@ -11,6 +11,17 @@ export const AI_PROVIDERS = {
   MISTRAL: 'mistral'
 };
 
+// Conversation types we'll handle
+const CONVERSATION_TYPES = {
+  GREETING: 'greeting',
+  GIT_OPERATION: 'git_operation',
+  GITHUB_OPERATION: 'github_operation',
+  UNRELATED: 'unrelated',
+  THANKS: 'thanks',
+  HELP: 'help',
+  ERROR: 'error'
+};
+
 let currentProvider = AI_PROVIDERS.MISTRAL;
 let openaiClient = null;
 let anthropicClient = null;
@@ -57,9 +68,7 @@ async function getAnthropicClient() {
 
 async function getMistralClient() {
   if (!mistralClient) {
-    // Use the Vercel proxy endpoint
     const mistralProxyUrl = process.env.MISTRAL_PROXY_URL || 'https://gitbot-jtp2.onrender.com/api/mistral';
-    console.log('mistralProxyUrl', mistralProxyUrl);
     mistralClient = {
       async chat(messages, options = {}) {
         const response = await fetch(mistralProxyUrl, {
@@ -71,12 +80,54 @@ async function getMistralClient() {
           throw new Error(`Mistral Proxy error: ${response.status} ${await response.text()}`);
         }
         const data = await response.json();
-        // Adapt to the expected return value
         return data.choices?.[0]?.message?.content || data.choices?.[0]?.text || data;
       }
     };
   }
   return mistralClient;
+}
+
+// Helper function to detect conversation type
+function detectConversationType(query) {
+  if (!query || query.trim().length < 2) {
+    return { type: CONVERSATION_TYPES.ERROR, response: "I didn't quite catch that. Could you please rephrase?" };
+  }
+
+  const lowerQuery = query.toLowerCase().trim();
+
+  // Greetings detection
+  const greetings = ['hello', 'hi', 'hey', 'greetings', 'good morning', 'good afternoon', 'good evening'];
+  if (greetings.some(g => lowerQuery.includes(g))) {
+    return { type: CONVERSATION_TYPES.GREETING };
+  }
+
+  // Thanks detection
+  if (lowerQuery.includes('thank') || lowerQuery.includes('thanks') || lowerQuery.includes('appreciate')) {
+    return { type: CONVERSATION_TYPES.THANKS };
+  }
+
+  // Help detection
+  if (lowerQuery.includes('help') || lowerQuery.includes('what can you do')) {
+    return { type: CONVERSATION_TYPES.HELP };
+  }
+
+  // How are you detection
+  if (lowerQuery.includes('how are you') || lowerQuery.includes("what's up")) {
+    return { 
+      type: CONVERSATION_TYPES.GREETING,
+      response: "I'm just a program, but I'm functioning well! How can I help you with version control?"
+    };
+  }
+
+  // Git/GitHub operation detection
+  const gitKeywords = ['git', 'push', 'pull', 'commit', 'branch', 'merge', 'rebase', 'clone', 'fork', 'repo'];
+  const githubKeywords = ['github', 'pull request', 'pr', 'issue', 'repository'];
+  if (gitKeywords.some(k => lowerQuery.includes(k)) || githubKeywords.some(k => lowerQuery.includes(k))) {
+    return { type: lowerQuery.includes('github') ? CONVERSATION_TYPES.GITHUB_OPERATION : CONVERSATION_TYPES.GIT_OPERATION };
+  }
+
+  // If none of the above, assume unrelated
+  return { type: CONVERSATION_TYPES.UNRELATED };
 }
 
 export const aiService = {
@@ -97,6 +148,7 @@ export const aiService = {
       } else if (process.env.AI_PROVIDER) {
         provider = process.env.AI_PROVIDER;
       }
+      
       if (apiKey) {
         // Test the connection
         if (provider === AI_PROVIDERS.OPENAI) {
@@ -130,7 +182,7 @@ export const aiService = {
         logger.warn('API key not configured. Users can set AI_PROVIDER and API key environment variables or run "gitmate init" to set up.', { service: serviceName });
         return false;
       }
-      console.log('configProvider', configProvider);
+
       // Test the connection
       if (configProvider === AI_PROVIDERS.OPENAI) {
         const client = await getOpenAIClient();
@@ -161,8 +213,10 @@ export const aiService = {
       if (aiResponseCache.has(cacheKey)) {
         return aiResponseCache.get(cacheKey);
       }
+
       const provider = await configManager.getAIProvider();
       let response;
+
       if (provider === AI_PROVIDERS.OPENAI) {
         const client = await getOpenAIClient();
         response = await client.chat.completions.create({
@@ -193,10 +247,10 @@ export const aiService = {
       } else {
         throw new Error(`Unsupported AI provider: ${provider}`);
       }
+
       aiResponseCache.set(cacheKey, response);
       return response;
     } catch (error) {
-      // User-friendly error for 429
       if (error.message && error.message.includes('429')) {
         logger.error('AI service rate limit reached (429):', { message: error.message, service: serviceName });
         return '⚠️ The AI service is currently overloaded or your usage limit has been reached. Please wait a few minutes and try again, or consider upgrading your service tier.';
@@ -206,23 +260,74 @@ export const aiService = {
     }
   },
 
-  async parseIntent(query) {
+  async handleConversation(query, username = 'there') {
     try {
       // Check cache first
+      const cacheKey = `conversation:${query}`;
+      if (aiResponseCache.has(cacheKey)) {
+        return aiResponseCache.get(cacheKey);
+      }
+
+      const { type } = detectConversationType(query);
+
+      // Handle simple cases without calling the AI
+      switch (type) {
+        case CONVERSATION_TYPES.GREETING:
+          return `Hello ${username}! 👋 I'm GitMate, your Git assistant. How can I help you with version control today?`;
+        case CONVERSATION_TYPES.THANKS:
+          return `You're welcome, ${username}! 😊 Let me know if you need any more help with Git or GitHub.`;
+        case CONVERSATION_TYPES.UNRELATED:
+          return `Hey ${username}, I'm specialized in Git operations. I can help you with version control, repositories, and GitHub-related tasks. What would you like to do with your code?`;
+        case CONVERSATION_TYPES.HELP:
+          return this.generateCommandHelp();
+      }
+
+      // For Git/GitHub operations or complex cases, use the AI
+      const prompt = `You are GitMate, a friendly Git/GitHub assistant. The user "${username}" asked: "${query}"
+
+      Your response should be:
+      1. For Git/GitHub operations: Explain what will happen or ask for clarification
+      2. For greetings: Friendly response that invites Git-related questions
+      3. For unrelated questions: Politely explain you focus on Git/GitHub
+      4. For thanks: Warm acknowledgment
+      5. Always be concise and helpful
+
+      Response:`;
+
+      const response = await this.generateResponse(prompt, { max_tokens: 300 });
+      aiResponseCache.set(cacheKey, response);
+      return response;
+    } catch (error) {
+      logger.error('Conversation handling failed:', { message: error.message, service: serviceName });
+      return `Sorry ${username}, I'm having trouble understanding. Could you rephrase your request in terms of Git or GitHub operations?`;
+    }
+  },
+
+  async parseIntent(query) {
+    try {
+      // First check if this is a conversation rather than a Git command
+      const { type } = detectConversationType(query);
+      if (type !== CONVERSATION_TYPES.GIT_OPERATION && type !== CONVERSATION_TYPES.GITHUB_OPERATION) {
+        return { intent: type, entities: {} };
+      }
+
+      // Check cache for Git operations
       const cacheKey = `intent:${query}`;
       if (aiResponseCache.has(cacheKey)) {
         return aiResponseCache.get(cacheKey);
       }
-      const provider = await configManager.getAIProvider();
-      const prompt = `Analyze this Git command and extract the intent and entities. Return a JSON object with:
-- intent: The main action (push_changes, create_branch, git_commit, etc.)
-- entities: Object with relevant parameters (branch, commit_message, files, etc.)
 
-Query: "${query}"
+      const prompt = `Analyze this Git/GitHub command and extract the intent and entities. Return a JSON object with:
+      - intent: The main action (push_changes, create_branch, git_commit, create_pr, etc.)
+      - entities: Object with relevant parameters (branch, commit_message, files, etc.)
+      - confidence: Your confidence score (0-1)
+      
+      Query: "${query}"
+      
+      Return only valid JSON:`;
 
-Return only valid JSON:`;
-
-      const response = await this.generateResponse(prompt, { max_tokens: 500 });
+      const response = await this.generateResponse(prompt, { max_tokens: 500, temperature: 0.2 });
+      
       let parsed;
       try {
         // Handle markdown-wrapped JSON responses
@@ -237,54 +342,84 @@ Return only valid JSON:`;
         logger.error('Failed to parse AI response as JSON:', { response, error: parseError.message, service: serviceName });
         parsed = { intent: 'unknown', entities: { error: 'Failed to parse response' } };
       }
+
+      // Add default values for common entities
+      parsed.entities = parsed.entities || {};
+      if (parsed.intent === 'push_changes' && !parsed.entities.branch) {
+        parsed.entities.branch = 'current';
+      }
+      if (!parsed.entities.remote && (parsed.intent === 'push_changes' || parsed.intent === 'pull_changes')) {
+        parsed.entities.remote = 'origin';
+      }
+
       aiResponseCache.set(cacheKey, parsed);
       return parsed;
     } catch (error) {
-      // User-friendly error for 429
       if (error.message && error.message.includes('429')) {
         logger.error('AI service rate limit reached (429):', { message: error.message, service: serviceName });
-        return { intent: 'error', entities: { error: '⚠️ The AI service is currently overloaded or your usage limit has been reached. Please wait a few minutes and try again, or consider upgrading your service tier.' } };
+        return { intent: 'error', entities: { error: '⚠️ The AI service is currently overloaded. Please wait a few minutes and try again.' } };
       }
       logger.error('Intent parsing failed:', { message: error.message, service: serviceName });
       return { intent: 'unknown', entities: { error: error.message } };
     }
   },
 
-  async generateConfirmation(parsed) {
+  async generateConfirmation(parsed, username = 'there') {
     try {
-      const prompt = `Generate a clear, user-friendly confirmation message for this Git operation:
+      // Handle non-Git operations
+      if (['greeting', 'thanks', 'unrelated', 'help'].includes(parsed.intent)) {
+        return this.handleConversation(parsed.intent, username);
+      }
 
-Intent: ${parsed.intent}
-Entities: ${JSON.stringify(parsed.entities, null, 2)}
+      const prompt = `Generate a clear, friendly confirmation message for this Git operation for user "${username}":
 
-Write a brief, natural confirmation message that explains what will happen:`;
+      Intent: ${parsed.intent}
+      Entities: ${JSON.stringify(parsed.entities, null, 2)}
+      
+      Write a brief, natural confirmation message that:
+      1. Explains what will happen
+      2. Uses the user's name if available
+      3. Asks for confirmation if needed
+      4. Is warm and professional
+      
+      Message:`;
 
       return await this.generateResponse(prompt, { max_tokens: 200 });
     } catch (error) {
       logger.error('Confirmation generation failed:', { message: error.message, service: serviceName });
-      return null;
+      return `I'll perform the ${parsed.intent} operation. Let me know if you'd like to proceed.`;
     }
   },
 
   async generateCommitMessage(diff) {
     try {
+      if (!diff?.trim()) {
+        return 'chore: no changes detected';
+      }
+
       const prompt = `Analyze this Git diff and generate a concise, conventional commit message:
 
-${diff}
+      ${diff.substring(0, 2000)}
+      
+      Generate a commit message in the format: <type>(<scope>): <description>
+      
+      Common types:
+      - feat: New feature
+      - fix: Bug fix
+      - docs: Documentation changes
+      - style: Code style/formatting
+      - refactor: Code refactoring
+      - perf: Performance improvement
+      - test: Test changes
+      - chore: Maintenance/boring tasks
+      
+      Commit message:`;
 
-Generate a commit message in the format: <type>(<scope>): <description>
-
-Examples:
-- feat(auth): add user authentication system
-- fix(ui): resolve button alignment issue
-- docs(readme): update installation instructions
-
-Commit message:`;
-
-      return await this.generateResponse(prompt, { max_tokens: 100 });
+      const response = await this.generateResponse(prompt, { max_tokens: 100, temperature: 0.3 });
+      return response.trim().replace(/^["']|["']$/g, '');
     } catch (error) {
       logger.error('Commit message generation failed:', { message: error.message, service: serviceName });
-      return null;
+      return 'fix: code changes';
     }
   },
 
@@ -292,33 +427,42 @@ Commit message:`;
     try {
       const prompt = `Generate a comprehensive .gitignore file for this project:
 
-Project: ${projectDescription}
+      Project: ${projectDescription}
+      
+      Include patterns for:
+      - Operating system files
+      - IDE/editor files
+      - Build artifacts
+      - Dependencies
+      - Logs
+      - Environment files
+      - Project-specific exclusions
+      
+      .gitignore:`;
 
-Generate a .gitignore file with appropriate entries for this type of project. Include common patterns for:
-- Operating system files
-- IDE/editor files
-- Build artifacts
-- Dependencies
-- Logs
-- Environment files
-
-.gitignore:`;
-
-      return await this.generateResponse(prompt, { max_tokens: 800 });
+      return await this.generateResponse(prompt, { max_tokens: 800, temperature: 0.1 });
     } catch (error) {
       logger.error('Gitignore generation failed:', { message: error.message, service: serviceName });
-      return null;
+      return '# Default gitignore\n*.log\n*.tmp\nnode_modules/\n.env\n';
     }
   },
 
   async generateCommandHelp() {
     try {
-      const prompt = `Generate a helpful message showing common GitMate commands and examples. Make it friendly and easy to understand.`;
+      const prompt = `Generate a helpful message showing common GitMate commands and examples. 
+      Make it friendly, concise, and format it nicely with emojis where appropriate.
+      Include basic Git operations and GitHub-related commands.`;
 
       return await this.generateResponse(prompt, { max_tokens: 400 });
     } catch (error) {
       logger.error('Help generation failed:', { message: error.message, service: serviceName });
-      return null;
+      return `Here are some common Git commands I can help with:
+      - git push/pull
+      - git commit
+      - git branch
+      - git merge
+      - GitHub PRs/issues
+      Ask me about any of these!`;
     }
   }
 };

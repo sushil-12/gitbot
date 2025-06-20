@@ -383,6 +383,30 @@ export async function handleNlpCommand(query) {
         }
         break;
         
+      case 'greeting': {
+        let userName = null;
+        let isAuthenticated = false;
+        try {
+          const token = await ensureAuthenticated();
+          if (token) {
+            const profile = await githubService.getUserProfile();
+            if (profile && (profile.name || profile.login)) {
+              userName = profile.name || profile.login;
+              isAuthenticated = true;
+            }
+          }
+        } catch (e) {
+          // Not authenticated or failed to fetch user
+        }
+        if (isAuthenticated && userName) {
+          console.log(chalk.cyan(`\nHello, ${userName}! 👋\n`));
+        } else {
+          console.log(chalk.cyan("\nHello! 👋\n"));
+          console.log(chalk.yellow("To interact more with me, please login with GitHub using 'gitmate auth' or 'gitmate init'."));
+        }
+        console.log(chalk.gray("\nCreated by Sushil Kumar"));
+        break;
+      }
       case 'create_repo':
       case 'create_repository':
         const tokenForCreateRepo = await ensureAuthenticated();

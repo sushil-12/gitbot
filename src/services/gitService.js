@@ -95,7 +95,7 @@ export async function ensureOriginRemoteWithToken(directoryPath = '.') {
     try {
       const userProfile = await getUserProfile();
       if (userProfile && userProfile.login) username = userProfile.login;
-    } catch {}
+    } catch {console.log("Error getting user profile");}
     // Parse owner/repo from URL
     const urlParts = origin.refs.fetch.match(/github\.com[/:]([^/]+)\/([^/.]+)(\.git)?$/);
     if (!urlParts || urlParts.length < 3) return;

@@ -80,7 +80,7 @@ export async function checkMistralStatus() {
  */
 export async function generateResponse(prompt, systemMessage = null, options = {}) {
   let messages = [];
-  
+
   // Handle different input types
   if (Array.isArray(prompt)) {
     // If prompt is already an array of messages, use it directly
@@ -92,9 +92,9 @@ export async function generateResponse(prompt, systemMessage = null, options = {
     }
     messages.push({ role: 'user', content: prompt });
   } else {
-    logger.technical.error('Invalid prompt type. Expected string or array.', { 
-      promptType: typeof prompt, 
-      service: serviceName 
+    logger.technical.error('Invalid prompt type. Expected string or array.', {
+      promptType: typeof prompt,
+      service: serviceName
     });
     return null;
   }
@@ -113,10 +113,10 @@ export async function generateResponse(prompt, systemMessage = null, options = {
     stream: false
   };
 
-  logger.technical.debug(`Sending to Mistral`, { 
+  logger.technical.debug(`Sending to Mistral`, {
     messageCount: messages.length,
     firstMessage: messages[0]?.content?.substring(0, 50) + '...',
-    service: serviceName 
+    service: serviceName
   });
 
   try {
@@ -142,10 +142,10 @@ export async function generateResponse(prompt, systemMessage = null, options = {
 
     if (response.data && response.data.choices && response.data.choices[0]?.message?.content) {
       const content = response.data.choices[0].message.content.trim();
-      logger.technical.debug(`Received Mistral response`, { 
+      logger.technical.debug(`Received Mistral response`, {
         length: content.length,
         truncated: content.substring(0, 100) + '...',
-        service: serviceName 
+        service: serviceName
       });
       return content;
     } else {
@@ -165,20 +165,31 @@ export async function generateResponse(prompt, systemMessage = null, options = {
 }
 
 export async function parseIntent(naturalLanguageQuery) {
-  const systemPrompt = `You are an expert at interpreting natural language commands for Git and GitHub operations.
-Your task is to identify the user's intent and extract relevant entities.
-Respond ONLY with a valid JSON object containing "intent" and "entities" fields.
-Do not include any explanations, markdown, or additional text.
+  console.log("naturalLanguageQuery in mistral service", naturalLanguageQuery);
+  const systemPrompt = `You are an expert at interpreting natural language commands and conversations.
+Your primary task is to:
+1. Identify if the user is asking about Git/GitHub operations
+2. Handle general conversations (greetings, small talk)
+3. Recognize when the user asks unrelated questions
+
+For Git operations, respond with a JSON object containing "intent" and "entities" fields.
+For non-Git conversations, respond with a JSON object containing "intent": "conversation" and "response" fields.
 
 Important rules:
-- If the user mentions "push", "push changes", "push code", etc., the intent is ALWAYS "push_changes"
-- If no branch is specified for push_changes, use "current" (we'll determine the actual branch later)
-- If no remote is specified, use "origin"
-- If the user mentions "backup branch creation" or "with backup", set create_backup: true
-- Do not interpret "backup" as a branch name unless explicitly stated as "branch called backup"
-- Be intelligent and make reasonable assumptions for incomplete requests
+- ALWAYS respond with valid JSON
+- For greetings (hello, hi, hey, good morning/afternoon/evening), respond with "greeting" intent
+- For "how are you" or similar, respond with "conversation" intent and a friendly response
+- For clearly unrelated questions (e.g., "what's the weather?"), respond with "unrelated" intent
+- For Git operations, follow the specific formatting rules below
 
-Available intents:
+Git-specific rules:
+- Push commands: intent is "push_changes"
+- If no branch is specified for push_changes, use "current"
+- If no remote is specified, use "origin"
+- For "backup branch creation" or "with backup", set create_backup: true
+- Don't interpret "backup" as a branch name unless explicitly stated
+
+Available Git intents:
 - push_changes: Push local changes to a remote repository
 - create_repo: Create a new repository
 - list_repos: List user's repositories
@@ -188,32 +199,47 @@ Available intents:
 - git_status: Show working tree status
 - git_revert_last_commit: Revert the last commit
 
-Entity examples for push_changes:
-- commit_message (string): The commit message to use
-- branch (string): The branch to push to (use "current" if not specified)
-- remote (string): The remote to push to (default: origin)
-- force (boolean): Whether to force push
-- create_backup (boolean): Whether to create a backup branch
-- set_as_default (boolean): Whether to set as default branch
+Conversation intents:
+- greeting: Simple greetings (hello, hi, etc.)
+- conversation: General chat or questions
+- unrelated: Clearly non-Git related questions
 
 Example responses:
 "push my changes" → {"intent": "push_changes", "entities": {"branch": "current"}}
-"push code please" → {"intent": "push_changes", "entities": {"branch": "current"}}
-"push to main" → {"intent": "push_changes", "entities": {"branch": "main"}}
+"hello" → {"intent": "greeting", "response": "Hello! How can I help you with Git today?"}
+"hi there" → {"intent": "greeting", "response": "Hi there! Ready to work with Git?"}
+"how are you?" → {"intent": "conversation", "response": "I'm just a program, but I'm functioning well! How can I assist you with version control?"}
+"what's the weather?" → {"intent": "unrelated", "response": "I'm focused on Git operations. Can I help you with version control or repository management?"}
+"thanks" → {"intent": "conversation", "response": "You're welcome! Let me know if you need any more help with Git."}
 "push code with commit message called final changes with backup branch creation" → {"intent": "push_changes", "entities": {"commit_message": "final changes", "create_backup": true, "branch": "current"}}
 "force push to main" → {"intent": "push_changes", "entities": {"branch": "main", "force": true}}`;
 
-  const prompt = `Parse this user query: "${naturalLanguageQuery}"
+  const prompt = `Interpret this user input: "${naturalLanguageQuery}"
 
-JSON response:`;
+Respond with JSON only:`;
 
   try {
     logger.technical.debug(`Parsing intent for query: "${naturalLanguageQuery}"`, { service: serviceName });
-    const responseText = await generateResponse(prompt, systemPrompt, { temperature: 0.1 });
+    
+    // First, check for empty or nonsensical input
+    if (!naturalLanguageQuery || naturalLanguageQuery.trim().length < 2) {
+      return {
+        intent: 'error',
+        response: "I didn't quite catch that. Could you please rephrase or ask about Git operations?"
+      };
+    }
+
+    const responseText = await generateResponse(prompt, systemPrompt, { 
+      temperature: 0.1,
+      max_tokens: 300
+    });
 
     if (!responseText) {
       logger.technical.error('No response from LLM for intent parsing.', { service: serviceName });
-      return { intent: 'unknown', entities: { error: 'LLM did not respond' } };
+      return { 
+        intent: 'error', 
+        response: "I'm having trouble understanding. Could you rephrase your request?"
+      };
     }
 
     try {
@@ -227,39 +253,51 @@ JSON response:`;
       }
 
       const jsonResponse = JSON.parse(cleanResponse);
-      
-      // Validate the response
+
+      // Validate the response structure
       if (!jsonResponse.intent || typeof jsonResponse.intent !== 'string') {
         throw new Error('Invalid intent in response');
       }
 
-      // Normalize entities
-      jsonResponse.entities = jsonResponse.entities || {};
-
-      // Special handling for backup branch creation
-      if (naturalLanguageQuery.toLowerCase().includes('backup branch creation') || 
-          naturalLanguageQuery.toLowerCase().includes('with backup')) {
-        jsonResponse.entities.create_backup = true;
+      // Handle conversation intents
+      if (['greeting', 'conversation', 'unrelated'].includes(jsonResponse.intent)) {
+        if (!jsonResponse.response) {
+          // Generate default responses for conversation types
+          switch (jsonResponse.intent) {
+            case 'greeting':
+              jsonResponse.response = "Hello! How can I help you with Git today?";
+              break;
+            case 'conversation':
+              jsonResponse.response = "I'm happy to chat, but I'm best at helping with Git operations. What would you like to do with your repositories?";
+              break;
+            case 'unrelated':
+              jsonResponse.response = "I'm specialized in Git operations. Can I help you with version control or repository management?";
+              break;
+          }
+        }
+        return jsonResponse;
       }
 
-      // Remove backup from branch name if it was incorrectly parsed
-      if (jsonResponse.entities.branch === 'backup' && 
-          (naturalLanguageQuery.toLowerCase().includes('backup branch creation') || 
-           naturalLanguageQuery.toLowerCase().includes('with backup'))) {
-        delete jsonResponse.entities.branch;
-      }
-
-      // Ensure push_changes has a branch (default to current if not specified)
-      if (jsonResponse.intent === 'push_changes' && !jsonResponse.entities.branch) {
+      // Handle Git operations
+      if (jsonResponse.intent === 'push_changes' && !jsonResponse.entities?.branch) {
+        jsonResponse.entities = jsonResponse.entities || {};
         jsonResponse.entities.branch = 'current';
       }
 
-      logger.technical.info('Successfully parsed intent.', { 
-        intent: jsonResponse.intent, 
-        entities: jsonResponse.entities, 
-        service: serviceName 
+      // Special handling for backup branch creation
+      if (naturalLanguageQuery.toLowerCase().includes('backup branch creation') ||
+        naturalLanguageQuery.toLowerCase().includes('with backup')) {
+        jsonResponse.entities = jsonResponse.entities || {};
+        jsonResponse.entities.create_backup = true;
+      }
+
+      logger.technical.info('Successfully parsed intent.', {
+        intent: jsonResponse.intent,
+        entities: jsonResponse.entities || {},
+        response: jsonResponse.response || null,
+        service: serviceName
       });
-      
+
       return jsonResponse;
     } catch (parseError) {
       logger.technical.error('Failed to parse JSON response from LLM:', {
@@ -267,10 +305,39 @@ JSON response:`;
         error: parseError.message,
         service: serviceName
       });
-      
-      // Fallback parsing for common patterns
+
+      // Fallback to analyzing the query directly
       const lowerQuery = naturalLanguageQuery.toLowerCase();
-      if (lowerQuery.includes('push')) {
+      
+      // Check for greetings
+      const greetings = ['hello', 'hi', 'hey', 'greetings', 'good morning', 'good afternoon', 'good evening'];
+      if (greetings.some(g => lowerQuery.includes(g))) {
+        return {
+          intent: 'greeting',
+          response: "Hello! How can I assist you with Git today?"
+        };
+      }
+      
+      // Check for "how are you" type questions
+      if (lowerQuery.includes('how are you') || lowerQuery.includes("what's up")) {
+        return {
+          intent: 'conversation',
+          response: "I'm just a program, but I'm functioning well! How can I help you with version control?"
+        };
+      }
+      
+      // Check for thanks
+      if (lowerQuery.includes('thank') || lowerQuery.includes('thanks')) {
+        return {
+          intent: 'conversation',
+          response: "You're welcome! Let me know if you need any more help with Git."
+        };
+      }
+      
+      // Check for Git-like commands
+      if (lowerQuery.includes('push') || lowerQuery.includes('commit') || 
+          lowerQuery.includes('branch') || lowerQuery.includes('merge') ||
+          lowerQuery.includes('pull') || lowerQuery.includes('repo')) {
         return {
           intent: 'push_changes',
           entities: {
@@ -281,25 +348,22 @@ JSON response:`;
         };
       }
       
-      return { intent: 'unknown', entities: { error: 'Failed to parse LLM response', raw_response: responseText } };
-    }
-  } catch (error) {
-    logger.technical.error('Error during intent parsing with Mistral:', { message: error.message, service: serviceName });
-    
-    // Fallback parsing for common patterns
-    const lowerQuery = naturalLanguageQuery.toLowerCase();
-    if (lowerQuery.includes('push')) {
+      // Default to unrelated
       return {
-        intent: 'push_changes',
-        entities: {
-          branch: 'current',
-          error: 'fallback_parsing',
-          original_query: naturalLanguageQuery
-        }
+        intent: 'unrelated',
+        response: "I'm specialized in Git operations. Can I help you with version control or repository management?"
       };
     }
-    
-    return { intent: 'unknown', entities: { error: error.message } };
+  } catch (error) {
+    logger.technical.error('Error during intent parsing with Mistral:', { 
+      message: error.message, 
+      service: serviceName 
+    });
+
+    return {
+      intent: 'error',
+      response: "I encountered an error processing your request. Could you please try again or rephrase?"
+    };
   }
 }
 

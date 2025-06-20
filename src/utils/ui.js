@@ -55,10 +55,10 @@ class ProfessionalUI {
 
     const titleLine = ` ${title} ${version ? colors.muted(`v${version}`) : ''} `;
     const headerWidth = Math.min(MAX_WIDTH, titleLine.length + 8);
-    
+
     console.log(
       boxen(
-        colors.primary(titleLine), 
+        colors.primary(titleLine),
         {
           padding: 1,
           margin: { top: 1, bottom: 0 },
@@ -118,10 +118,10 @@ class ProfessionalUI {
   error(message, errorObj = null) {
     let details = '';
     if (errorObj) {
-      details = NODE_ENV === 'development' 
-        ? errorObj.stack 
+      details = NODE_ENV === 'development'
+        ? errorObj.stack
         : errorObj.message;
-      
+
       // Shorten file paths for readability (only if details is a string)
       if (typeof details === 'string') {
         details = details.replace(new RegExp(homedir(), 'g'), '~');
@@ -357,8 +357,11 @@ class ProfessionalUI {
     const headers = options.headers || Object.keys(uniqueData[0]);
     const columnWidths = headers.map(header => {
       const headerLength = header.length;
-      const maxDataLength = Math.max(...uniqueData.map(row => 
+      const maxDataLength = Math.max(...uniqueData.map(row =>
+        /* eslint-disable no-control-regex */
         String(row[header] || '').replace(/\u001b\[[0-9;]*m/g, '').length
+        /* eslint-disable no-control-regex */
+
       ));
       return Math.min(
         Math.max(headerLength, maxDataLength, 12),
@@ -380,6 +383,7 @@ class ProfessionalUI {
     console.log(chalk.blue(`┌${divider}┐`));
     console.log(chalk.blue(`│ ${headerRow} │`));
     console.log(chalk.blue(`├${divider}┤`));
+/* eslint-disable no-control-regex */
 
     uniqueData.forEach(row => {
       const rowText = headers
@@ -393,6 +397,7 @@ class ProfessionalUI {
         .join(' │ ');
       console.log(chalk.white(`│ ${rowText} │`));
     });
+/* eslint-disable no-control-regex */
 
     console.log(chalk.blue(`└${divider}┘`));
   }
@@ -459,7 +464,7 @@ class ProfessionalUI {
       width
     );
     const incomplete = width - complete;
-    
+
     const bar = [
       colors.green('█'.repeat(complete)),
       colors.gray('░'.repeat(incomplete))
@@ -472,7 +477,7 @@ class ProfessionalUI {
       this._spinner.text = `${bar} ${percentage}% | ${text}`;
     } else {
       process.stdout.write(
-        `\r${bar} ${percentage}% | ${text}` + 
+        `\r${bar} ${percentage}% | ${text}` +
         (current === total ? '\n' : '')
       );
     }
@@ -483,22 +488,22 @@ class ProfessionalUI {
    */
   help(commands) {
     this.section('Available Commands');
-    
+
     commands.forEach(cmd => {
-      console.log(colors.cyan(`  ${cmd.name.padEnd(20)}`) + 
-                 colors.white(cmd.description));
-      
+      console.log(colors.cyan(`  ${cmd.name.padEnd(20)}`) +
+        colors.white(cmd.description));
+
       if (cmd.usage) {
         console.log(colors.muted(`    Usage: ${cmd.usage}`));
       }
-      
+
       if (cmd.examples && cmd.examples.length > 0) {
         console.log(colors.muted('    Examples:'));
         cmd.examples.forEach(ex => {
           console.log(colors.muted(`      ${ex}`));
         });
       }
-      
+
       console.log('');
     });
   }
@@ -530,27 +535,27 @@ class ProfessionalUI {
     if (value === undefined || value === null) {
       return colors.muted('undefined');
     }
-    
+
     if (typeof value === 'boolean') {
       return value ? colors.green('true') : colors.red('false');
     }
-    
+
     if (typeof value === 'number') {
       return colors.cyan(value.toString());
     }
-    
+
     if (Array.isArray(value)) {
       return value.map(v => this._formatValue(v)).join(', ');
     }
-    
+
     if (typeof value === 'object') {
       return JSON.stringify(value, null, 2);
     }
-    
+
     if (options.password) {
       return '*'.repeat(value.length);
     }
-    
+
     return value;
   }
 
