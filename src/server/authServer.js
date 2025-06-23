@@ -39,7 +39,7 @@ export class AuthServer {
     this.app.use(express.json());
     this.app.use(express.urlencoded({ extended: true }));
     this.app.use(express.static(join(__dirname, 'public')));
-    
+
     // Session configuration
     this.app.use(session({
       secret: process.env.SESSION_SECRET || 'gitbot-secret-key',
@@ -84,7 +84,7 @@ export class AuthServer {
         accessToken,
         refreshToken
       };
-      
+
       return done(null, user);
     }));
 
@@ -111,12 +111,12 @@ export class AuthServer {
     // GitHub OAuth routes
     this.app.get('/auth/github', passport.authenticate('github', { scope: ['user', 'repo'] }));
 
-    this.app.get('/auth/github/callback', 
+    this.app.get('/auth/github/callback',
       passport.authenticate('github', { failureRedirect: '/auth/failure' }),
       (req, res) => {
         // Successful authentication
         const user = req.user;
-        
+
         // Store tokens in config
         config.set('github.accessToken', user.accessToken);
         config.set('github.refreshToken', user.refreshToken);
@@ -127,9 +127,9 @@ export class AuthServer {
           email: user.email
         });
 
-        logger.info('GitHub authentication successful', { 
+        logger.info('GitHub authentication successful', {
           username: user.username,
-          userId: user.id 
+          userId: user.id
         });
 
         // Send success response
@@ -226,7 +226,7 @@ export class AuthServer {
 
     // Error handling
     this.app.use((err, req, res, next) => {
-      logger.error('Auth server error:', err);
+      logger.error('Auth server error:', err, req, next);
       res.status(500).json({ error: 'Internal server error' });
     });
   }
@@ -277,7 +277,7 @@ export async function startAuthServer() {
     const authUrl = process.env.GITMATE_AUTH_URL || 'https://gitbot-jtp2.onrender.com/auth/github';
     console.log(authUrl);
 
-    UI.info('GitHub Authentication', 
+    UI.info('GitHub Authentication',
       'Opening browser for GitHub authentication...\n\n' +
       'This will redirect you to GitHub to authorize GitMate.'
     );

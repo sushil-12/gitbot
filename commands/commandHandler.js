@@ -18,8 +18,10 @@ async function ensureAuthenticated() {
   let token = await getToken('github_access_token');
   if (!token) {
     logger.warn('User is not authenticated. Please authenticate first.', { service: serviceName });
-    const port = process.env.PORT || 3000;
-    const authInitiateUrl = `http://localhost:${port}/auth/github`;
+
+    // Determine the correct auth URL
+    const renderAuthUrl = process.env.RENDER_AUTH_URL || 'https://gitbot-jtp2.onrender.com/auth/github';
+    const authInitiateUrl = renderAuthUrl;
 
     UI.error('Authentication Required', 
       'You need to authenticate with GitHub to use this feature.');
