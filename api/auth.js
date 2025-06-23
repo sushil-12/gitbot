@@ -9,7 +9,7 @@ import fetch from 'node-fetch'; // If using Node <18, otherwise use global fetch
 import crypto from 'crypto';
 import { logger } from '../src/utils/logger.js';
 
-
+dotenv.config();
 const ENCRYPTION_KEY = process.env.GITBOT_SECRET_KEY; // 32 bytes for AES-256
 const IV_LENGTH = 16; // For AES, this is always 16
 
@@ -25,7 +25,7 @@ function encrypt(text) {
 }
 
 const app = express();
-dotenv.config();
+
 // Add JSON body parser middleware before routes
 app.use(express.json());
 
@@ -109,22 +109,10 @@ app.get('/auth/github/callback',
       }
 
       const user = req.user;
-      
-      // Encrypt tokens before storage
       const encryptedToken = encrypt(user.accessToken);
       if (!encryptedToken) {
         throw new Error('Token encryption failed');
       }
-
-      // Securely store tokens and user data
-      config.set('github.accessToken', user.accessToken);
-      config.set('github.refreshToken', user.refreshToken || '');
-      config.set('github.user', {
-        id: user.id,
-        username: user.username,
-        displayName: user.displayName || user.username,
-        email: user.email || ''
-      });
 
       logger.info('GitHub authentication successful', {
         username: user.username,
@@ -135,8 +123,10 @@ app.get('/auth/github/callback',
       // Generate safe HTML output
       const safeDisplayName = escapeHtml(user.displayName || user.username);
       const safeUsername = escapeHtml(user.username);
+      const truncatedToken = encryptedToken.length > 32 
+        ? `${encryptedToken.substring(0, 32)}...` 
+        : encryptedToken;
 
-      // Send success response with improved UI
       res.status(200).send(`
         <!DOCTYPE html>
         <html lang="en">
@@ -145,12 +135,16 @@ app.get('/auth/github/callback',
           <meta name="viewport" content="width=device-width, initial-scale=1.0">
           <meta http-equiv="X-UA-Compatible" content="ie=edge">
           <title>Authentication Success | GitBot</title>
+          <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
           <style>
             :root {
               --primary: #6e48aa;
               --secondary: #9d50bb;
               --success: #4ade80;
               --text-light: #f8f9fa;
+              --text-muted: #e9ecef;
+              --card-bg: rgba(255, 255, 255, 0.08);
+              --border-radius: 12px;
             }
             
             * {
@@ -160,8 +154,7 @@ app.get('/auth/github/callback',
             }
             
             body {
-              font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 
-                Oxygen, Ubuntu, Cantarell, 'Open Sans', 'Helvetica Neue', sans-serif;
+              font-family: 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, 'Open Sans', 'Helvetica Neue', sans-serif;
               display: flex;
               justify-content: center;
               align-items: center;
@@ -170,56 +163,100 @@ app.get('/auth/github/callback',
               background: linear-gradient(135deg, var(--primary), var(--secondary));
               color: var(--text-light);
               line-height: 1.6;
+              padding: 20px;
             }
             
             .container {
               text-align: center;
-              background: rgba(255, 255, 255, 0.1);
+              background: var(--card-bg);
               padding: 2.5rem;
-              border-radius: 16px;
-              backdrop-filter: blur(8px);
-              box-shadow: 0 8px 32px rgba(0, 0, 0, 0.2);
+              border-radius: var(--border-radius);
+              backdrop-filter: blur(12px);
+              box-shadow: 0 12px 40px rgba(0, 0, 0, 0.15);
               max-width: 90%;
-              width: 450px;
+              width: 500px;
               animation: fadeIn 0.5s ease-out;
             }
             
             h1 {
-              margin-bottom: 1rem;
+              margin-bottom: 1.5rem;
               font-size: 2rem;
+              font-weight: 600;
             }
             
             .avatar {
-              width: 80px;
-              height: 80px;
+              width: 96px;
+              height: 96px;
               border-radius: 50%;
-              margin: 0 auto 1rem;
-              border: 3px solid white;
+              margin: 0 auto 1.5rem;
+              border: 3px solid rgba(255, 255, 255, 0.2);
               object-fit: cover;
+              box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
             }
             
             .user-info {
               margin: 1.5rem 0;
             }
             
+            .token-container {
+              background: rgba(0, 0, 0, 0.2);
+              padding: 1rem;
+              border-radius: var(--border-radius);
+              margin: 1.5rem 0;
+              position: relative;
+              word-break: break-all;
+              font-family: 'Courier New', monospace;
+              font-size: 0.9rem;
+            }
+            
+            .token-label {
+              display: block;
+              margin-bottom: 0.5rem;
+              font-size: 0.85rem;
+              color: var(--text-muted);
+              text-transform: uppercase;
+              letter-spacing: 0.5px;
+            }
+            
+            .copy-btn {
+              position: absolute;
+              top: 0.5rem;
+              right: 0.5rem;
+              background: rgba(255, 255, 255, 0.1);
+              border: none;
+              color: var(--text-light);
+              padding: 0.25rem 0.5rem;
+              border-radius: 4px;
+              cursor: pointer;
+              font-size: 0.75rem;
+              transition: all 0.2s ease;
+            }
+            
+            .copy-btn:hover {
+              background: rgba(255, 255, 255, 0.2);
+            }
+            
             .close-btn {
               background: rgba(255, 255, 255, 0.2);
               border: none;
               color: white;
-              padding: 12px 24px;
+              padding: 12px 28px;
               border-radius: 50px;
               cursor: pointer;
               margin-top: 1.5rem;
-              font-weight: 600;
+              font-weight: 500;
               transition: all 0.3s ease;
               display: inline-flex;
               align-items: center;
               gap: 8px;
+              font-size: 0.95rem;
+              box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
             }
             
             .close-btn:hover {
               background: rgba(255, 255, 255, 0.3);
               transform: translateY(-2px);
+              box-shadow: 0 6px 8px rgba(0, 0, 0, 0.15);
             }
             
             .checkmark {
@@ -227,6 +264,13 @@ app.get('/auth/github/callback',
               margin-bottom: 1rem;
               color: var(--success);
               animation: bounce 0.5s;
+            }
+            
+            .instructions {
+              font-size: 0.9rem;
+              color: var(--text-muted);
+              margin: 1rem 0;
+              line-height: 1.5;
             }
             
             @keyframes fadeIn {
@@ -242,19 +286,24 @@ app.get('/auth/github/callback',
             
             @media (max-width: 480px) {
               .container {
-                padding: 1.5rem;
+                padding: 1.75rem;
               }
               
               h1 {
-                font-size: 1.5rem;
+                font-size: 1.65rem;
+              }
+              
+              .avatar {
+                width: 80px;
+                height: 80px;
               }
             }
           </style>
         </head>
         <body>
           <div class="container">
-            <div class="checkmark">✓</div>
-            <h1>Authentication Successful!</h1>
+            <div class="checkmark"><i class="fas fa-check-circle"></i></div>
+            <h1>Authentication Successful</h1>
             
             ${user.photos?.[0]?.value ? `
               <img src="${escapeHtml(user.photos[0].value)}" alt="Profile" class="avatar">
@@ -262,42 +311,40 @@ app.get('/auth/github/callback',
             
             <div class="user-info">
               <p>Welcome, <strong>${safeDisplayName}</strong>!</p>
-              <p>You are logged in as <code>${safeUsername}</code></p>
+              <p class="instructions">Your access token has been securely generated and encrypted.</p>
             </div>
             
-            <p>You can now close this window and return to your terminal.</p>
+            <div class="token-container">
+              <span class="token-label">Encrypted Access Token</span>
+              <button class="copy-btn" onclick="copyToClipboard('${escapeHtml(encryptedToken)}')">
+                <i class="far fa-copy"></i> Copy
+              </button>
+              <div id="token">${truncatedToken}</div>
+            </div>
+            
+            <p class="instructions">You can now close this window and return to your terminal.</p>
             
             <button class="close-btn" onclick="window.close()">
-              <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 16 16">
-                <path d="M4.646 4.646a.5.5 0 0 1 .708 0L8 7.293l2.646-2.647a.5.5 0 0 1 .708.708L8.707 8l2.647 2.646a.5.5 0 0 1-.708.708L8 8.707l-2.646 2.647a.5.5 0 0 1-.708-.708L7.293 8 4.646 5.354a.5.5 0 0 1 0-.708z"/>
-              </svg>
-              Close Window
+              <i class="fas fa-times"></i> Close Window
             </button>
           </div>
           
           <script>
-            // Attempt to close window automatically if possible
-            setTimeout(() => {
-              try {
-                if (window.opener || window.history.length <= 1) {
-                  window.close();
-                }
-              } catch (e) {
-                console.log('Window could not close automatically');
-              }
-            }, 3000);
+            function copyToClipboard(text) {
+              navigator.clipboard.writeText(text).then(() => {
+                const copyBtn = document.querySelector('.copy-btn');
+                copyBtn.innerHTML = '<i class="fas fa-check"></i> Copied!';
+                setTimeout(() => {
+                  copyBtn.innerHTML = '<i class="far fa-copy"></i> Copy';
+                }, 2000);
+              }).catch(err => {
+                console.error('Failed to copy: ', err);
+              });
+            }
           </script>
         </body>
         </html>
       `);
-
-      // Close server after successful auth
-      setTimeout(() => {
-        this.stop().catch(err => {
-          logger.error('Failed to stop server after authentication', { error: err.message });
-        });
-      }, 2000);
-
     } catch (error) {
       logger.error('Authentication callback error', {
         error: error.message,
@@ -307,6 +354,7 @@ app.get('/auth/github/callback',
     }
   }
 );
+
 
 // Helper function to escape HTML
 function escapeHtml(unsafe) {

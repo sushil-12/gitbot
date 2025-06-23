@@ -1,29 +1,39 @@
 import logger from '../src/utils/logger.js';
 import UI from '../src/utils/ui.js';
 import * as prompter from '../src/utils/prompter.js';
-import fs from 'fs/promises';
-import path from 'path';
 import * as githubService from '../src/services/githubService.js';
 import * as gitService from '../src/services/gitService.js';
 import { aiService, AI_PROVIDERS, setProvider } from '../src/services/aiServiceFactory.js';
 import { getToken, clearAllTokens, storeToken } from '../src/utils/tokenManager.js';
 import inquirer from 'inquirer';
 import chalk from 'chalk';
+import dotenv from 'dotenv';
+import crypto from 'crypto';
 
+
+// Load environment variables
+dotenv.config();
 const ENCRYPTION_KEY = process.env.GITBOT_SECRET_KEY; // Must be the same as backend
 const IV_LENGTH = 16;
 
 function decrypt(text) {
-  let textParts = text.split(':');
-  let iv = Buffer.from(textParts.shift(), 'hex');
-  let encryptedText = Buffer.from(textParts.join(':'), 'hex');
-  let decipher = crypto.createDecipheriv('aes-256-cbc', Buffer.from(ENCRYPTION_KEY), iv);
-  let decrypted = decipher.update(encryptedText);
+  try {
+    let textParts = text.split(':');
+    let iv = Buffer.from(textParts.shift(), 'hex');
+    let encryptedText = Buffer.from(textParts.join(':'), 'hex');
+    let decipher = crypto.createDecipheriv('aes-256-cbc', Buffer.from(ENCRYPTION_KEY), iv);
+    let decrypted = decipher.update(encryptedText);
 
-  decrypted = Buffer.concat([decrypted, decipher.final()]);
-
-  return decrypted.toString();
+    decrypted = Buffer.concat([decrypted, decipher.final()]);
+    console.log(decrypted.toString());
+    return decrypted.toString();
+  } catch (error) {
+    console.error('Decryption error:', error.message);
+    console.error(error); // for full stack trace if needed
+    return null; // or throw error, depending on how you want to handle it
+  }
 }
+
 
 
 const serviceName = 'CommandHandler';
@@ -54,6 +64,7 @@ async function ensureAuthenticated() {
       },
     ]);
     const decryptedToken = decrypt(enteredToken.trim());
+    console.log(decryptedToken);
     await storeToken('github_access_token', decryptedToken);
     token = decryptedToken;
   }
@@ -811,7 +822,8 @@ export async function handleAuth(args) {
           validate: input => input.trim() !== '' || 'Token is required',
         },
       ]);
-      await storeToken('github_access_token', token.trim());
+      tokensaved = await storeToken('github_access_token', token.trim());
+      console.log(tokensaved)
       UI.success('Authentication Complete', 'Your GitHub token has been saved. You are now authenticated!');
       break;
     }

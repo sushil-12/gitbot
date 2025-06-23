@@ -1,7 +1,7 @@
 import winston from 'winston';
 import chalk from 'chalk';
 
-const NODE_ENV = process.env.NODE_ENV || 'development';
+const NODE_ENV = "production";
 const LOG_LEVEL = process.env.LOG_LEVEL || (NODE_ENV === 'production' ? 'error' : 'debug');
 
 // Custom format for development
@@ -73,7 +73,6 @@ const userLogger = {
     if (NODE_ENV === 'development') {
       logger.info(`✅ ${message}`, { ...options, type: 'success' });
     }
-    console.log(chalk.green(`✅ ${message}`));
   },
 
   // Info messages for users
@@ -81,7 +80,6 @@ const userLogger = {
     if (NODE_ENV === 'development') {
       logger.info(`ℹ️  ${message}`, { ...options, type: 'info' });
     }
-    console.log(chalk.blue(`ℹ️  ${message}`));
   },
 
   // Warning messages for users
@@ -89,7 +87,6 @@ const userLogger = {
     if (NODE_ENV === 'development') {
       logger.warn(`⚠️  ${message}`, { ...options, type: 'warning' });
     }
-    console.log(chalk.yellow(`⚠️  ${message}`));
   },
 
   // Error messages for users
@@ -97,7 +94,6 @@ const userLogger = {
     if (NODE_ENV === 'development') {
       logger.error(`❌ ${message}`, { ...options, type: 'error' });
     }
-    console.log(chalk.red(`❌ ${message}`));
   },
 
   // Progress indicators
@@ -105,7 +101,6 @@ const userLogger = {
     if (NODE_ENV === 'development') {
       logger.info(`🔄 ${message}`, { ...options, type: 'progress' });
     }
-    console.log(chalk.cyan(`🔄 ${message}`));
   },
 
   // Debug messages (development only)

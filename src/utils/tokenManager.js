@@ -30,6 +30,7 @@ export async function getToken(key) {
 }
 
 export async function storeToken(key, value) {
+  console.log(key,value)
   if (value == null) {
     await configManager.setToken(key, value);
     return;

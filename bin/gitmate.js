@@ -5,6 +5,7 @@ import { dirname, join } from 'path';
 import { handleNlpCommand, handleRepoCommand, handleGitCommand, handleGenerateGitignore, handleGenerateCommitMessage, handleAuthLogout, handleSwitchAIProvider } from '../commands/commandHandler.js';
 import logger from '../src/utils/logger.js';
 import UI from '../src/utils/ui.js';
+import { storeToken } from '../src/utils/tokenManager.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -269,7 +270,6 @@ async function handleAuth(args) {
       await startAuthServer();
       // Prompt for token after browser is opened
       const inquirer = (await import('inquirer')).default;
-      const { storeToken } = await import('../src/utils/tokenManager.js');
       const { token } = await inquirer.prompt([
         {
           type: 'password',
@@ -279,6 +279,7 @@ async function handleAuth(args) {
           validate: input => input.trim() !== '' || 'Token is required',
         },
       ]);
+      console.log("i am clalle");
       await storeToken('github_access_token', token.trim());
       console.log('Authentication Complete: Your GitHub token has been saved. You are now authenticated!');
       break;
