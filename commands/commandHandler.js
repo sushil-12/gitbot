@@ -10,6 +10,22 @@ import { getToken, clearAllTokens, storeToken } from '../src/utils/tokenManager.
 import inquirer from 'inquirer';
 import chalk from 'chalk';
 
+const ENCRYPTION_KEY = process.env.GITBOT_SECRET_KEY; // Must be the same as backend
+const IV_LENGTH = 16;
+
+function decrypt(text) {
+  let textParts = text.split(':');
+  let iv = Buffer.from(textParts.shift(), 'hex');
+  let encryptedText = Buffer.from(textParts.join(':'), 'hex');
+  let decipher = crypto.createDecipheriv('aes-256-cbc', Buffer.from(ENCRYPTION_KEY), iv);
+  let decrypted = decipher.update(encryptedText);
+
+  decrypted = Buffer.concat([decrypted, decipher.final()]);
+
+  return decrypted.toString();
+}
+
+
 const serviceName = 'CommandHandler';
 
 let diffViewerInitialized = false;
@@ -37,8 +53,9 @@ async function ensureAuthenticated() {
         validate: input => input.trim() !== '' || 'Token is required',
       },
     ]);
-    await storeToken('github_access_token', enteredToken.trim());
-    token = enteredToken.trim();
+    const decryptedToken = decrypt(enteredToken.trim());
+    await storeToken('github_access_token', decryptedToken);
+    token = decryptedToken;
   }
   return token;
 }
