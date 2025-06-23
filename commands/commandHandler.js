@@ -17,21 +17,15 @@ const ENCRYPTION_KEY = process.env.GITBOT_SECRET_KEY; // Must be the same as bac
 const IV_LENGTH = 16;
 
 function decrypt(text) {
-  try {
-    let textParts = text.split(':');
-    let iv = Buffer.from(textParts.shift(), 'hex');
-    let encryptedText = Buffer.from(textParts.join(':'), 'hex');
-    let decipher = crypto.createDecipheriv('aes-256-cbc', Buffer.from(ENCRYPTION_KEY), iv);
-    let decrypted = decipher.update(encryptedText);
-
-    decrypted = Buffer.concat([decrypted, decipher.final()]);
-    console.log(decrypted.toString());
-    return decrypted.toString();
-  } catch (error) {
-    console.error('Decryption error:', error.message);
-    console.error(error); // for full stack trace if needed
-    return null; // or throw error, depending on how you want to handle it
-  }
+  if (!text || typeof text !== 'string' || !text.includes(':')) return text;
+  const [ivHex, encryptedHex] = text.split(':');
+  if (!ivHex || !encryptedHex) return text; // Not encrypted
+  const iv = Buffer.from(ivHex, 'hex');
+  const encryptedText = Buffer.from(encryptedHex, 'hex');
+  const decipher = crypto.createDecipheriv('aes-256-cbc', Buffer.from(ENCRYPTION_KEY, 'utf8'), iv);
+  let decrypted = decipher.update(encryptedText);
+  decrypted = Buffer.concat([decrypted, decipher.final()]);
+  return decrypted.toString('utf8');
 }
 
 
