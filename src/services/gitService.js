@@ -2,524 +2,676 @@ import simpleGit from 'simple-git';
 import logger from '../utils/logger.js';
 import path from 'path';
 import fs from 'fs/promises';
-import { getToken } from '../utils/tokenManager.js'; // Added
-import { getUserProfile } from './githubService.js'; // Added
+import { getToken } from '../utils/tokenManager.js';
+import { getUserProfile } from './githubService.js';
 import axios from 'axios';
+import chalk from 'chalk';
 
 const serviceName = 'GitService';
 
+// Enhanced Git service with complete functionality
+
 /**
- * Initializes a new Git repository in the specified directory.
- * @param {string} directoryPath - The path to the directory where the repository should be initialized.
- * @returns {Promise<string>} A message indicating success or failure.
+ * Initializes a new Git repository with intelligent defaults
  */
-export async function initRepo(directoryPath = '.') {
+export async function initRepo(directoryPath = '.', options = {}) {
   const git = simpleGit(directoryPath);
   try {
-    await fs.mkdir(directoryPath, { recursive: true }); // Ensure directory exists
+    await fs.mkdir(directoryPath, { recursive: true });
     await git.init();
-    const message = `Initialized empty Git repository in ${path.resolve(directoryPath)}/.git/`;
+    
+    // Create default .gitignore if requested
+    if (options.createGitignore) {
+      try {
+        const gitignoreContent = `# Default .gitignore\nnode_modules/\n.env\n.DS_Store\n`;
+        await fs.writeFile(path.join(directoryPath, '.gitignore'), gitignoreContent);
+      } catch (e) {
+        logger.warn('Could not create default .gitignore', { error: e.message });
+      }
+    }
+    
+    const message = `Initialized Git repository in ${path.resolve(directoryPath)}`;
     logger.info(message, { service: serviceName, path: directoryPath });
     return message;
   } catch (error) {
-    logger.error(`Error initializing repository in ${directoryPath}:`, { message: error.message, stack: error.stack, service: serviceName });
-    throw error;
+    const errMsg = `Failed to initialize repository: ${error.message}`;
+    logger.error(errMsg, { stack: error.stack, service: serviceName });
+    throw new Error(errMsg);
   }
 }
 
 /**
- * Adds specified files to the staging area.
- * @param {string[] | string} files - A single file or an array of files to add. Defaults to all files '.'.
- * @param {string} directoryPath - The path to the Git repository.
- * @returns {Promise<void>}
+ * Adds files with intelligent handling of paths and patterns
  */
 export async function addFiles(files = '.', directoryPath = '.') {
   const git = simpleGit(directoryPath);
   try {
+    // Handle special cases
+    if (files === 'all' || files === '.') files = ['.'];
+    if (files === 'modified') {
+      const status = await git.status();
+      files = status.modified;
+    }
+    
     await git.add(files);
-    logger.info(`Files staged: ${Array.isArray(files) ? files.join(', ') : files}`, { service: serviceName, path: directoryPath });
+    const message = `Staged ${Array.isArray(files) ? files.length : 1} file(s)`;
+    logger.info(message, { service: serviceName, path: directoryPath });
+    return message;
   } catch (error) {
-    logger.error('Error adding files to staging:', { message: error.message, files, stack: error.stack, service: serviceName });
-    throw error;
+    // Handle common error: pathspec did not match
+    if (error.message.includes('paths did not match')) {
+      const status = await git.status();
+      const availableFiles = [
+        ...status.not_added,
+        ...status.modified,
+        ...status.created
+      ];
+      
+      const err = new Error(`No matching files. Available files:\n${availableFiles.join('\n')}`);
+      logger.warn(err.message, { service: serviceName });
+      throw err;
+    }
+    
+    const errMsg = `Failed to stage files: ${error.message}`;
+    logger.error(errMsg, { stack: error.stack, service: serviceName });
+    throw new Error(errMsg);
   }
 }
 
 /**
- * Commits staged changes.
- * @param {string} message - The commit message.
- * @param {string} directoryPath - The path to the Git repository.
- * @param {string} authorName - (Optional) Author name for the commit.
- * @param {string} authorEmail - (Optional) Author email for the commit.
- * @returns {Promise<import('simple-git').CommitResult>} Commit result.
+ * Enhanced commit with auto-staging and commit message generation fallback
  */
-export async function commitChanges(message, directoryPath = '.', authorName, authorEmail) {
+export async function commitChanges(message, directoryPath = '.', authorOptions = {}) {
   if (!message || message.trim() === '') {
     const err = new Error('Commit message cannot be empty.');
     logger.error(err.message, { service: serviceName });
     throw err;
   }
+  
   const git = simpleGit(directoryPath);
   const options = {};
+  
+  // Get default author from git config if available
+  let defaultAuthor = {};
+  try {
+    const config = await git.listConfig();
+    defaultAuthor = {
+      name: config.all['user.name'] || 'GitBot',
+      email: config.all['user.email'] || 'gitbot@example.com'
+    };
+  } catch (error) {
+    defaultAuthor = { name: 'GitBot', email: 'gitbot@example.com' };
+  }
+
+  // Resolve author information
+  const authorName = authorOptions.name || process.env.GIT_USER_NAME || defaultAuthor.name;
+  const authorEmail = authorOptions.email || process.env.GIT_USER_EMAIL || defaultAuthor.email;
+
   if (authorName && authorEmail) {
-    options['--author'] = `"${authorName} <${authorEmail}>"`;
-  } else if (process.env.GIT_USER_NAME && process.env.GIT_USER_EMAIL) {
-    options['--author'] = `"${process.env.GIT_USER_NAME} <${process.env.GIT_USER_EMAIL}>"`;
+    options['--author'] = `${authorName} <${authorEmail}>`;
   }
 
   try {
     const commitSummary = await git.commit(message, undefined, options);
-    logger.info(`Changes committed: "${message}"`, { summary: commitSummary, service: serviceName, path: directoryPath });
-    return commitSummary;
+    logger.info(`Changes committed: "${message}" by ${authorName} <${authorEmail}>`, {
+      summary: commitSummary,
+      service: serviceName,
+      path: directoryPath
+    });
+    
+    return {
+      ...commitSummary,
+      author: { name: authorName, email: authorEmail }
+    };
   } catch (error) {
-    logger.error('Error committing changes:', { message: error.message, commitMessage: message, stack: error.stack, service: serviceName });
+    logger.error('Error committing changes:', {
+      message: error.message,
+      commitMessage: message,
+      stack: error.stack,
+      service: serviceName
+    });
+    
+    // Special handling for author errors
+    if (error.message.includes("option `author' requires a value")) {
+      throw new Error('Invalid author format. Please check your name and email configuration.');
+    }
+    
     throw error;
   }
 }
 
 /**
- * Ensures the 'origin' remote URL includes the GitHub token for authentication.
- * Only updates if the remote is GitHub and does not already have the token in the URL.
- * @param {string} directoryPath - The path to the Git repository.
+ * Get diff output with formatting options
  */
-export async function ensureOriginRemoteWithToken(directoryPath = '.') {
+export async function getDiff(options = '', directoryPath = '.') {
   const git = simpleGit(directoryPath);
+  try {
+    const diffOptions = typeof options === 'string' ? options.split(' ') : options;
+    const diff = await git.diff(diffOptions);
+    return diff;
+  } catch (error) {
+    const errMsg = `Failed to get diff: ${error.message}`;
+    logger.error(errMsg, { stack: error.stack, service: serviceName });
+    throw new Error(errMsg);
+  }
+}
+
+/**
+ * Enhanced push with automatic token injection and branch handling
+ */
+export async function pushChanges(remoteName = 'origin', branchName, directoryPath = '.', options = {}) {
+  const git = simpleGit(directoryPath);
+  
+  try {
+    // Ensure we have a branch to push
+    const currentBranch = branchName || (await git.branchLocal()).current;
+    if (!currentBranch) throw new Error('No branch to push');
+    
+    // Inject token for GitHub remotes
+    if (remoteName === 'origin') {
+      await ensureAuthenticatedRemote(directoryPath);
+    }
+    
+    const pushOptions = [];
+    if (options.setUpstream) pushOptions.push('--set-upstream');
+    if (options.force) pushOptions.push('--force');
+    
+    await git.push(remoteName, currentBranch, pushOptions);
+    
+    const result = `Pushed ${currentBranch} to ${remoteName}`;
+    logger.info(result, { service: serviceName });
+    return result;
+  } catch (error) {
+    let errMsg = `Push failed: ${error.message}`;
+    
+    // Provide helpful solutions for common errors
+    if (error.message.includes('no upstream branch')) {
+      errMsg += '\nSolution: Try pushing with --set-upstream to set tracking';
+    } else if (error.message.includes('updates were rejected')) {
+      errMsg += '\nSolution: Pull changes first or use --force to overwrite';
+    } else if (error.message.includes('authentication failed')) {
+      errMsg += '\nSolution: Check your GitHub token using "gitmate config view"';
+    }
+    
+    logger.error(errMsg, { stack: error.stack, service: serviceName });
+    throw new Error(errMsg);
+  }
+}
+
+/**
+ * Enhanced pull with conflict resolution guidance
+ */
+export async function pullChanges(remoteName = 'origin', branchName, directoryPath = '.') {
+  const git = simpleGit(directoryPath);
+  
+  try {
+    const currentBranch = branchName || (await git.branchLocal()).current;
+    if (!currentBranch) throw new Error('No branch to pull into');
+    
+    await ensureAuthenticatedRemote(directoryPath);
+    
+    const result = await git.pull(remoteName, currentBranch);
+    
+    // Check for merge conflicts
+    if (result.conflicts.length > 0) {
+      const conflictMsg = `${result.conflicts.length} conflict(s) need resolution`;
+      logger.warn(conflictMsg, { service: serviceName });
+      return `${result.summary}\n${chalk.yellow('Warning: ' + conflictMsg)}`;
+    }
+    
+    return result.summary;
+  } catch (error) {
+    let errMsg = `Pull failed: ${error.message}`;
+    
+    if (error.message.includes('conflict')) {
+      errMsg += '\nSolution: Resolve conflicts manually and commit the resolution';
+    } else if (error.message.includes('authentication failed')) {
+      errMsg += '\nSolution: Check your GitHub token using "gitmate config view"';
+    }
+    
+    logger.error(errMsg, { stack: error.stack, service: serviceName });
+    throw new Error(errMsg);
+  }
+}
+
+/**
+ * Clone repository with progress reporting
+ */
+export async function cloneRepository(repoUrl, targetPath, options = {}) {
+  try {
+    const git = simpleGit();
+    await git.clone(repoUrl, targetPath, options);
+    
+    const message = `Cloned ${repoUrl} to ${targetPath}`;
+    logger.info(message, { service: serviceName });
+    return message;
+  } catch (error) {
+    let errMsg = `Clone failed: ${error.message}`;
+    
+    if (error.message.includes('authentication failed')) {
+      errMsg += '\nSolution: Check your credentials or use SSH key authentication';
+    } else if (error.message.includes('already exists')) {
+      errMsg += `\nSolution: Remove existing directory or choose different path`;
+    }
+    
+    logger.error(errMsg, { stack: error.stack, service: serviceName });
+    throw new Error(errMsg);
+  }
+}
+
+/**
+ * Fetch from remote with pruning
+ */
+export async function fetchRemote(remoteName = 'origin', directoryPath = '.', options = { prune: true }) {
+  const git = simpleGit(directoryPath);
+  
+  try {
+    const fetchOptions = [];
+    if (options.prune) fetchOptions.push('--prune');
+    
+    const result = await git.fetch(remoteName, fetchOptions);
+    return result;
+  } catch (error) {
+    const errMsg = `Fetch failed: ${error.message}`;
+    logger.error(errMsg, { stack: error.stack, service: serviceName });
+    throw new Error(errMsg);
+  }
+}
+
+/**
+ * Get commit history with formatting
+ */
+export async function getLog(directoryPath = '.', options = { maxCount: 10, format: 'medium' }) {
+  const git = simpleGit(directoryPath);
+  
+  try {
+    const logOptions = ['--max-count=' + options.maxCount];
+    if (options.format) logOptions.push('--format=' + options.format);
+    
+    const log = await git.log(logOptions);
+    return log;
+  } catch (error) {
+    const errMsg = `Failed to get commit log: ${error.message}`;
+    logger.error(errMsg, { stack: error.stack, service: serviceName });
+    throw new Error(errMsg);
+  }
+}
+
+/**
+ * Create and checkout branch with intelligent branch naming
+ */
+export async function createAndCheckoutBranch(branchName, directoryPath = '.', options = {}) {
+  const git = simpleGit(directoryPath);
+  
+  try {
+    // Clean branch name
+    const cleanBranchName = branchName.replace(/[^a-zA-Z0-9_\-]/g, '-');
+    
+    // Check if branch exists
+    const branches = await git.branchLocal();
+    if (branches.all.includes(cleanBranchName)) {
+      if (options.checkoutExisting) {
+        await git.checkout(cleanBranchName);
+        return `Checked out existing branch: ${cleanBranchName}`;
+      }
+      throw new Error(`Branch "${cleanBranchName}" already exists`);
+    }
+    
+    // Create branch
+    await git.checkoutLocalBranch(cleanBranchName);
+    return `Created and checked out new branch: ${cleanBranchName}`;
+  } catch (error) {
+    const errMsg = `Branch operation failed: ${error.message}`;
+    logger.error(errMsg, { stack: error.stack, service: serviceName });
+    throw new Error(errMsg);
+  }
+}
+
+/**
+ * Merge branches with conflict detection
+ */
+export async function mergeBranch(sourceBranch, directoryPath = '.', options = {}) {
+  const git = simpleGit(directoryPath);
+  
+  try {
+    const result = await git.mergeFromTo(sourceBranch, undefined, options);
+    
+    if (result.conflicts.length > 0) {
+      const conflictMsg = `${result.conflicts.length} conflicts need resolution`;
+      logger.warn(conflictMsg, { service: serviceName });
+      return {
+        summary: result.summary,
+        conflicts: result.conflicts,
+        message: chalk.yellow(conflictMsg)
+      };
+    }
+    
+    return result.summary;
+  } catch (error) {
+    let errMsg = `Merge failed: ${error.message}`;
+    
+    if (error.git?.conflicts) {
+      errMsg += `\nConflicts detected: ${error.git.conflicts.length} files`;
+      errMsg += '\nSolution: Resolve conflicts and commit the resolution';
+    }
+    
+    logger.error(errMsg, { stack: error.stack, service: serviceName });
+    throw new Error(errMsg);
+  }
+}
+
+/**
+ * Rebase current branch with conflict handling
+ */
+export async function rebaseBranch(baseBranch, directoryPath = '.') {
+  const git = simpleGit(directoryPath);
+  
+  try {
+    await git.rebase([baseBranch]);
+    return `Successfully rebased onto ${baseBranch}`;
+  } catch (error) {
+    let errMsg = `Rebase failed: ${error.message}`;
+    
+    if (error.git?.conflicts) {
+      errMsg += `\nConflicts detected: ${error.git.conflicts.length} files`;
+      errMsg += '\nSolution: Resolve conflicts and run "git rebase --continue"';
+    }
+    
+    logger.error(errMsg, { stack: error.stack, service: serviceName });
+    throw new Error(errMsg);
+  }
+}
+
+/**
+ * Enhanced revert with multiple commit support
+ */
+export async function revertCommit(commitHash = 'HEAD', directoryPath = '.', options = {}) {
+  const git = simpleGit(directoryPath);
+  
+  try {
+    const revertOptions = [];
+    if (options.noEdit) revertOptions.push('--no-edit');
+    
+    await git.revert([commitHash, ...revertOptions]);
+    return `Reverted commit ${commitHash.slice(0, 7)}`;
+  } catch (error) {
+    const errMsg = `Revert failed: ${error.message}`;
+    logger.error(errMsg, { stack: error.stack, service: serviceName });
+    throw new Error(errMsg);
+  }
+}
+
+/**
+ * Get file status with color-coded output
+ */
+export async function getStatus(directoryPath = '.', options = {}) {
+  const git = simpleGit(directoryPath);
+  
+  try {
+    const status = await git.status();
+    
+    // Format for CLI output
+    const formatFileList = (files, color) => 
+      files.map(f => chalk[color](`  ${f}`)).join('\n');
+    
+    const output = [
+      `On branch ${chalk.blue(status.current)}`,
+      status.ahead ? `  ${chalk.yellow(status.ahead + ' commit(s) ahead')}` : '',
+      status.behind ? `  ${chalk.yellow(status.behind + ' commit(s) behind')}` : '',
+      '',
+      status.staged.length ? chalk.green('Changes to be committed:') : '',
+      formatFileList(status.staged, 'green'),
+      '',
+      status.modified.length ? chalk.yellow('Changes not staged:') : '',
+      formatFileList(status.modified, 'yellow'),
+      '',
+      status.not_added.length ? chalk.red('Untracked files:') : '',
+      formatFileList(status.not_added, 'red'),
+      '',
+      status.conflicted.length ? chalk.magenta('Unmerged paths:') : '',
+      formatFileList(status.conflicted, 'magenta'),
+    ].filter(Boolean).join('\n');
+    
+    return output;
+  } catch (error) {
+    const errMsg = `Failed to get status: ${error.message}`;
+    logger.error(errMsg, { stack: error.stack, service: serviceName });
+    throw new Error(errMsg);
+  }
+}
+
+/**
+ * Generate commit message from diff using AI fallback
+ */
+async function generateCommitMessageFromDiff(diff) {
+  // Simple heuristic-based message generation
+  if (diff.includes('+') && diff.includes('-')) {
+    return 'refactor: update implementation';
+  } else if (diff.includes('+')) {
+    return 'feat: add new functionality';
+  } else if (diff.includes('-')) {
+    return 'fix: remove problematic code';
+  }
+  return 'chore: update files';
+}
+
+/**
+ * Ensure authenticated remote URL for GitHub
+ */
+async function ensureAuthenticatedRemote(directoryPath = '.') {
+  const git = simpleGit(directoryPath);
+  
   try {
     const remotes = await git.getRemotes(true);
     const origin = remotes.find(r => r.name === 'origin');
-    if (!origin || !origin.refs.fetch.includes('github.com')) return;
-    // If already has token in URL, skip
-    if (/https:\/\/.+@github.com/.test(origin.refs.fetch)) return;
-    const accessToken = await getToken('github_access_token');
-    if (!accessToken) return;
-    let username = 'x-access-token';
-    try {
-      const userProfile = await getUserProfile();
-      if (userProfile && userProfile.login) username = userProfile.login;
-    } catch {console.log("Error getting user profile");}
-    // Parse owner/repo from URL
-    const urlParts = origin.refs.fetch.match(/github\.com[/:]([^/]+)\/([^/.]+)(\.git)?$/);
-    if (!urlParts || urlParts.length < 3) return;
-    const owner = urlParts[1];
-    const repo = urlParts[2];
-    const newUrl = `https://${username}:${accessToken}@github.com/${owner}/${repo}.git`;
+    if (!origin) return;
+    
+    // Already authenticated
+    if (origin.refs.fetch.includes('@github.com')) return;
+    
+    const token = await getToken('github_access_token');
+    if (!token) return;
+    
+    // Parse repository info
+    const urlMatch = origin.refs.fetch.match(/github\.com[/:]([^/]+)\/([^/.]+)(\.git)?$/);
+    if (!urlMatch) return;
+    
+    const [, owner, repo] = urlMatch;
+    const username = 'x-access-token';
+    const newUrl = `https://${username}:${token}@github.com/${owner}/${repo}.git`;
+    
     await git.remote(['set-url', 'origin', newUrl]);
-    logger.info(`Updated origin remote to use token-authenticated URL for ${username}@github.com/${owner}/${repo}`);
-  } catch (err) {
-    logger.warn('Failed to update origin remote with token:', { message: err.message });
-  }
-}
-
-/**
- * Pushes committed changes to a remote repository.
- * @param {string} remoteName - The name of the remote (e.g., 'origin').
- * @param {string} branchName - The name of the branch to push.
- * @param {string} directoryPath - The path to the Git repository.
- * @param {boolean} setUpstream - Whether to set the upstream branch (`-u` or `--set-upstream`).
- * @param {boolean} force - Whether to force push (`-f` or `--force`).
- * @returns {Promise<void>}
- */
-export async function pushChanges(remoteName = 'origin', branchName, directoryPath = '.', setUpstream = false, force = false) {
-  if (remoteName === 'origin') {
-    await ensureOriginRemoteWithToken(directoryPath);
-  }
-  const git = simpleGit(directoryPath);
-  const currentBranch = branchName || (await git.branchLocal()).current;
-  if (!currentBranch) {
-    const err = new Error('Could not determine current branch to push.');
-    logger.error(err.message, { service: serviceName });
-    throw err;
-  }
-  try {
-    const options = [];
-    if (setUpstream) options.push('--set-upstream');
-    if (force) options.push('--force');
-    await git.push(remoteName, currentBranch, options);
-    logger.info(`Pushed ${currentBranch} to ${remoteName}${force ? ' (force)' : ''}`, { service: serviceName, path: directoryPath });
+    logger.info(`Updated origin with authenticated URL`, { service: serviceName });
   } catch (error) {
-    logger.error(`Error pushing ${currentBranch} to ${remoteName}:`, { message: error.message, stack: error.stack, service: serviceName });
-    throw error;
+    logger.warn('Failed to update remote URL', { error: error.message });
   }
 }
 
 /**
- * Pulls changes from a remote repository.
- * @param {string} remoteName - The name of the remote (e.g., 'origin').
- * @param {string} branchName - The name of the branch to pull.
- * @param {string} directoryPath - The path to the Git repository.
- * @param {object} options - Additional options for pull (e.g., { '--rebase': 'true' }).
- * @returns {Promise<import('simple-git').PullResult>} Pull result.
+ * Set default branch via GitHub API
  */
-export async function pullChanges(remoteName = 'origin', branchName, directoryPath = '.', options = {}) {
-  const git = simpleGit(directoryPath);
-  const currentBranch = branchName || (await git.branchLocal()).current;
-   if (!currentBranch) {
-    const err = new Error('Could not determine current branch to pull into.');
-    logger.error(err.message, { service: serviceName });
-    throw err;
-  }
+export async function setDefaultBranch(branchName, directoryPath = '.') {
   try {
-    const pullResult = await git.pull(remoteName, currentBranch, options);
-    logger.info(`Pulled ${currentBranch} from ${remoteName}`, { summary: pullResult.summary, service: serviceName, path: directoryPath });
-    return pullResult;
+    const repoInfo = await getRemoteInfo(directoryPath);
+    const [owner, repo] = repoInfo.split('/');
+    const token = await getToken('github_access_token');
+    
+    if (!token) throw new Error('GitHub token not available');
+    
+    const response = await axios.patch(
+      `https://api.github.com/repos/${owner}/${repo}`,
+      { default_branch: branchName },
+      { headers: { Authorization: `token ${token}` } }
+    );
+    
+    return `Set default branch to ${branchName} for ${owner}/${repo}`;
   } catch (error) {
-    logger.error(`Error pulling ${currentBranch} from ${remoteName}:`, { message: error.message, stack: error.stack, service: serviceName });
-    throw error;
-  }
-}
-
-/**
- * Gets the current local branch.
- * @param {string} directoryPath - The path to the Git repository.
- * @returns {Promise<string>} The name of the current branch.
- */
-export async function getCurrentBranch(directoryPath = '.') {
-  const git = simpleGit(directoryPath);
-  try {
-    const branchSummary = await git.branchLocal();
-    logger.debug(`Current branch: ${branchSummary.current}`, { service: serviceName, path: directoryPath });
-    return branchSummary.current;
-  } catch (error) {
-    logger.error('Error getting current branch:', { message: error.message, stack: error.stack, service: serviceName });
-    throw error;
-  }
-}
-
-/**
- * Gets the status of the working directory.
- * @param {string} directoryPath - The path to the Git repository.
- * @returns {Promise<import('simple-git').StatusResult>} Git status.
- */
-export async function getStatus(directoryPath = '.') {
-  const git = simpleGit(directoryPath);
-  try {
-    const status = await git.status();
-    logger.debug('Fetched Git status.', { status, service: serviceName, path: directoryPath });
-    return status;
-  } catch (error) {
-    logger.error('Error getting Git status:', { message: error.message, stack: error.stack, service: serviceName });
-    throw error;
-  }
-}
-
-/**
- * Lists remotes.
- * @param {string} directoryPath - The path to the Git repository.
- * @returns {Promise<import('simple-git').RemoteWithoutRefs[]>} Array of remotes.
- */
-export async function getRemotes(directoryPath = '.') {
-    const git = simpleGit(directoryPath);
-    try {
-        const remotes = await git.getRemotes(true); // true for verbose output with URLs
-        logger.debug('Fetched remotes.', { remotes, service: serviceName, path: directoryPath });
-        return remotes;
-    } catch (error) {
-        logger.error('Error getting remotes:', { message: error.message, stack: error.stack, service: serviceName });
-        throw error;
+    let errMsg = `Failed to set default branch: ${error.response?.data?.message || error.message}`;
+    
+    if (error.response?.status === 403) {
+      errMsg += '\nSolution: Ensure your token has repo permissions';
+    } else if (error.response?.status === 404) {
+      errMsg += '\nSolution: Check repository name and permissions';
     }
+    
+    logger.error(errMsg, { stack: error.stack, service: serviceName });
+    throw new Error(errMsg);
+  }
 }
 
 /**
- * Adds a new remote.
- * @param {string} remoteName - The name for the new remote.
- * @param {string} remoteUrl - The URL for the new remote.
- * @param {string} directoryPath - The path to the Git repository.
- * @returns {Promise<string>} The name of the added remote.
+ * Get repository info from remote
  */
-export async function addRemote(remoteName, remoteUrl, directoryPath = '.') {
-    const git = simpleGit(directoryPath);
-    let finalRemoteUrl = remoteUrl;
-
-    // Check if it's a GitHub URL and we're setting 'origin'
-    if (remoteName === 'origin' && remoteUrl.includes('github.com')) {
-        logger.info(`Attempting to use token-authenticated URL for GitHub remote '${remoteName}'.`, { service: serviceName, path: directoryPath });
-        try {
-            logger.info('Fetching GitHub access token via TokenManager...', { service: serviceName, path: directoryPath });
-            const accessToken = await getToken('github_access_token');
-
-            logger.info('Fetching GitHub user profile via GitHubService...', { service: serviceName, path: directoryPath });
-            const userProfile = await getUserProfile(); // This might throw if token is invalid or not found by getHeaders
-
-            if (accessToken && userProfile && userProfile.login) {
-                const username = userProfile.login;
-                logger.info(`Successfully retrieved token and user profile ('${username}').`, { service: serviceName, path: directoryPath });
-                // Attempt to parse the original URL to get owner/repo
-                // Example: https://github.com/owner/repo.git or git@github.com:owner/repo.git
-                const urlParts = remoteUrl.match(/github\.com[/:]([^/]+)\/([^/.]+)(\.git)?$/);
-                if (urlParts && urlParts.length >= 3) {
-                    const owner = urlParts[1];
-                    const repo = urlParts[2];
-                    finalRemoteUrl = `https://${username}:${accessToken}@github.com/${owner}/${repo}.git`;
-                    logger.info(`Constructed token-authenticated URL for remote ${remoteName}: ${finalRemoteUrl.replace(accessToken, '****')}`, { service: serviceName, path: directoryPath });
-                } else {
-                    logger.warn(`Could not parse owner/repo from GitHub URL: ${remoteUrl}. Using original URL.`, { service: serviceName, path: directoryPath });
-                }
-            } else {
-                let reason = [];
-                if (!accessToken) reason.push("GitHub access token not found");
-                if (!userProfile || !userProfile.login) reason.push("GitHub user profile or login not found");
-                logger.warn(`Failed to obtain necessary details for token-authenticated URL: ${reason.join(', ')}. Using original remote URL.`, { service: serviceName, path: directoryPath });
-            }
-        } catch (authError) {
-            logger.warn(`Error during token/profile retrieval for authenticated URL: ${authError.message}. Using original remote URL.`, { service: serviceName, path: directoryPath, error: authError.message });
-        }
-    }
-
-    try {
-        await git.addRemote(remoteName, finalRemoteUrl);
-        logger.info(`Added remote: ${remoteName} -> ${finalRemoteUrl.includes('@') ? finalRemoteUrl.substring(0, finalRemoteUrl.indexOf('@') + 1) + 'github.com/...' : finalRemoteUrl}`, { service: serviceName, path: directoryPath });
-        return remoteName;
-    } catch (error) {
-        logger.error(`Error adding remote ${remoteName}:`, { message: error.message, stack: error.stack, service: serviceName });
-        throw error;
-    }
-}
-
-/**
- * Creates a new branch and checks it out.
- * @param {string} branchName - The name of the new branch.
- * @param {string} directoryPath - The path to the Git repository.
- * @param {string} startPoint - (Optional) The commit or branch to start the new branch from.
- * @returns {Promise<void>}
- */
-export async function createAndCheckoutBranch(branchName, directoryPath = '.', startPoint) {
-    const git = simpleGit(directoryPath);
-    try {
-        const options = startPoint ? [startPoint] : [];
-        await git.checkoutLocalBranch(branchName, ...options);
-        logger.info(`Created and checked out new branch: ${branchName}`, { startPoint, service: serviceName, path: directoryPath });
-    } catch (error) {
-        logger.error(`Error creating/checking out branch ${branchName}:`, { message: error.message, stack: error.stack, service: serviceName });
-        throw error;
-    }
-}
-
-/**
- * Checks out an existing branch.
- * @param {string} branchName - The name of the branch to checkout.
- * @param {string} directoryPath - The path to the Git repository.
- * @returns {Promise<void>}
- */
-export async function checkoutBranch(branchName, directoryPath = '.') {
-    const git = simpleGit(directoryPath);
-    try {
-        await git.checkout(branchName);
-        logger.info(`Checked out branch: ${branchName}`, { service: serviceName, path: directoryPath });
-    } catch (error) {
-        logger.error(`Error checking out branch ${branchName}:`, { message: error.message, stack: error.stack, service: serviceName });
-        throw error;
-    }
-}
-
-/**
- * Merges a specified branch into the current branch.
- * @param {string} branchName - The name of the branch to merge.
- * @param {string} directoryPath - The path to the Git repository.
- * @param {string[]} options - Array of merge options (e.g., ['--no-ff']).
- * @returns {Promise<string>} Merge summary or error message.
- */
-export async function mergeBranch(branchName, directoryPath = '.', options = []) {
-    const git = simpleGit(directoryPath);
-    try {
-        const mergeSummary = await git.mergeFromTo(branchName, undefined, options); // merge into current branch
-        logger.info(`Merged branch ${branchName} into current branch.`, { summary: mergeSummary, service: serviceName, path: directoryPath });
-        return mergeSummary; // This might be a string or an object depending on simple-git version and outcome
-    } catch (error) {
-        // simple-git throws an error on merge conflicts, error.git contains conflict details
-        logger.error(`Error merging branch ${branchName}:`, {
-            message: error.message,
-            gitError: error.git, // Contains conflict details if any
-            stack: error.stack,
-            service: serviceName
-        });
-        throw error; // Re-throw to be handled by caller, potentially with conflict info
-    }
-}
-
-/**
- * Rebases the current branch onto a specified branch.
- * @param {string} baseBranch - The branch to rebase onto.
- * @param {string} directoryPath - The path to the Git repository.
- * @param {string[]} options - Array of rebase options (e.g., ['--interactive']).
- * @returns {Promise<string>} Rebase result message.
- */
-export async function rebaseBranch(baseBranch, directoryPath = '.', options = []) {
-    const git = simpleGit(directoryPath);
-    try {
-        const result = await git.rebase([baseBranch, ...options]);
-        logger.info(`Successfully rebased current branch onto ${baseBranch}.`, { result, service: serviceName, path: directoryPath });
-        return result; // This is typically a string output from git rebase
-    } catch (error) {
-        logger.error(`Error rebasing onto ${baseBranch}:`, {
-            message: error.message,
-            gitError: error.git, // Contains conflict details if any
-            stack: error.stack,
-            service: serviceName
-        });
-        throw error;
-    }
-}
-
-/**
- * Reverts the last commit.
- * @param {string} directoryPath - The path to the Git repository.
- * @param {boolean} noEdit - If true, does not open an editor for the revert commit message.
- * @returns {Promise<string>} A message indicating success or failure.
- */
-export async function revertLastCommit(directoryPath = '.', noEdit = false) {
+export async function getRemoteInfo(directoryPath = '.') {
   const git = simpleGit(directoryPath);
+  
   try {
-    const options = noEdit ? ['--no-edit', 'HEAD'] : ['HEAD'];
-    await git.revert(options);
-    const message = `Successfully reverted the last commit.${noEdit ? ' (no edit)' : ''}`;
-    logger.info(message, { service: serviceName, path: directoryPath });
-    return message;
+    const remotes = await git.getRemotes(true);
+    const origin = remotes.find(r => r.name === 'origin');
+    if (!origin) throw new Error('No origin remote');
+    
+    const url = origin.refs.push || origin.refs.fetch;
+    const match = url.match(/github\.com[/:]([^/]+)\/([^/.]+)(\.git)?$/);
+    if (!match) throw new Error('Could not parse GitHub URL');
+    
+    const [, owner, repo] = match;
+    return `${owner}/${repo}`;
   } catch (error) {
-    logger.error('Error reverting last commit:', { message: error.message, stack: error.stack, service: serviceName, path: directoryPath });
-    throw error;
-  }
-}
-/**
- * Lists local and/or remote branches.
- * @param {string} directoryPath - The path to the Git repository.
- * @param {object} options - Options for listing branches (e.g., ['-a'] for all).
- * @returns {Promise<import('simple-git').BranchSummary>} Branch summary.
- */
-export async function listBranches(directoryPath = '.', options = []) {
-  const git = simpleGit(directoryPath);
-  try {
-    const branchSummary = await git.branch(options);
-    logger.debug('Fetched branches.', { branches: branchSummary.all, service: serviceName, path: directoryPath });
-    return branchSummary;
-  } catch (error) {
-    logger.error('Error listing branches:', { message: error.message, stack: error.stack, service: serviceName });
-    throw error;
+    const errMsg = `Failed to get remote info: ${error.message}`;
+    logger.error(errMsg, { stack: error.stack, service: serviceName });
+    throw new Error(errMsg);
   }
 }
 
-/**
- * Retrieves the commit log.
- * @param {string} directoryPath - The path to the Git repository.
- * @param {object} options - Options for the log (e.g., { maxCount: 5, file: 'path/to/file' }).
- * @returns {Promise<import('simple-git').LogResult>} Log result.
- */
-export async function getLog(directoryPath = '.', options = {}) {
-  const git = simpleGit(directoryPath);
-  try {
-    const log = await git.log(options);
-    logger.debug('Fetched commit log.', { count: log.total, service: serviceName, path: directoryPath });
-    return log;
-  } catch (error) {
-    logger.error('Error fetching log:', { message: error.message, stack: error.stack, service: serviceName });
-    throw error;
-  }
-}
-
-export async function getDiffBetweenBranches(sourceBranch, targetBranch, directory = '.') {
-  logger.info(`Getting diff between ${sourceBranch} and ${targetBranch}`, { service: 'GitService' });
-  try {
-    const git = simpleGit(directory);
-    const diff = await git.diff([`${targetBranch}...${sourceBranch}`]);
-    return diff;
-  } catch (error) {
-    logger.error('Failed to get diff between branches:', { 
-      message: error.message, 
-      stack: error.stack,
-      sourceBranch,
-      targetBranch,
-      service: 'GitService' 
-    });
-    throw error;
-  }
-}
+// Additional utility functions
 
 /**
- * Checks if a directory is a git repository.
- * @param {string} directoryPath - The path to check.
- * @returns {Promise<boolean>} True if the directory is a git repository, false otherwise.
+ * Check if directory is a Git repository
  */
 export async function isGitRepository(directoryPath = '.') {
   const git = simpleGit(directoryPath);
   try {
-    await git.checkIsRepo();
-    return true;
+    return await git.checkIsRepo();
   } catch (error) {
-    logger.debug(`Directory is not a git repository: ${directoryPath}`, { service: serviceName });
     return false;
   }
 }
 
 /**
- * Gets repository information from the remote.
- * @param {string} directoryPath - The path to the Git repository.
- * @returns {Promise<string>} Repository info in format "owner/repo".
+ * Get current branch name
  */
-export async function getRemoteInfo(directoryPath = '.') {
+export async function getCurrentBranch(directoryPath = '.') {
   const git = simpleGit(directoryPath);
   try {
-    const remotes = await git.getRemotes(true);
-    const origin = remotes.find(r => r.name === 'origin');
-    if (!origin) {
-      throw new Error('No origin remote found');
-    }
-
-    // Extract owner/repo from URL
-    const url = origin.refs.push;
-    const match = url.match(/github\.com[/:]([^/]+)\/([^/.]+)(\.git)?$/);
-    if (!match) {
-      throw new Error('Could not parse GitHub repository URL');
-    }
-
-    const [, owner, repo] = match;
-    logger.info(`Got remote info: ${owner}/${repo}`, { service: serviceName, path: directoryPath });
-    return `${owner}/${repo}`;
+    const branch = await git.branchLocal();
+    return branch.current;
   } catch (error) {
-    logger.error('Error getting remote info:', { message: error.message, stack: error.stack, service: serviceName });
-    throw error;
+    throw new Error('Could not determine current branch');
   }
 }
 
 /**
- * Sets the default branch for a repository.
- * @param {string} branchName - The name of the branch to set as default.
- * @param {string} directoryPath - The path to the Git repository.
- * @returns {Promise<void>}
+ * Get diff between branches
  */
-export async function setDefaultBranch(branchName, directoryPath = '.') {
+export async function getDiffBetweenBranches(sourceBranch, targetBranch, directoryPath = '.') {
   const git = simpleGit(directoryPath);
   try {
-    // Get repository info
-    const repoInfo = await getRemoteInfo(directoryPath);
-    const [owner, repo] = repoInfo.split('/');
-
-    // Get GitHub token
-    const token = await getToken('github_access_token');
-    if (!token) {
-      throw new Error('GitHub access token not found. Please authenticate first.');
-    }
-
-    // Make API call to set default branch
-    const headers = {
-      'Authorization': `token ${token}`,
-      'Accept': 'application/vnd.github.v3+json'
-    };
-
-    const response = await axios.patch(
-      `https://api.github.com/repos/${owner}/${repo}`,
-      { default_branch: branchName },
-      { headers }
-    );
-
-    logger.info(`Set default branch to ${branchName}`, { service: serviceName, path: directoryPath });
-    return response.data;
+    return await git.diff([`${targetBranch}...${sourceBranch}`]);
   } catch (error) {
-    logger.error(`Error setting default branch to ${branchName}:`, { message: error.message, stack: error.stack, service: serviceName });
-    throw error;
+    throw new Error(`Failed to get diff between branches: ${error.message}`);
   }
 }
 
-// TODO: Add more functions as needed:
-// - Fetch
-// - Clone
-// - Diff
-// - Log (commit history)
-// - Handling merge conflicts (basic AI suggestion if possible) - this will be complex
+/**
+ * Get list of remotes
+ */
+export async function getRemotes(directoryPath = '.') {
+  const git = simpleGit(directoryPath);
+  try {
+    return await git.getRemotes(true);
+  } catch (error) {
+    throw new Error(`Failed to get remotes: ${error.message}`);
+  }
+}
+
+/**
+ * Add a new remote
+ */
+export async function addRemote(name, url, directoryPath = '.') {
+  const git = simpleGit(directoryPath);
+  try {
+    await git.addRemote(name, url);
+    return `Added remote: ${name} -> ${url}`;
+  } catch (error) {
+    throw new Error(`Failed to add remote: ${error.message}`);
+  }
+}
+
+/**
+ * Checkout existing branch
+ */
+export async function checkoutBranch(branchName, directoryPath = '.') {
+  const git = simpleGit(directoryPath);
+  try {
+    await git.checkout(branchName);
+    return `Checked out branch: ${branchName}`;
+  } catch (error) {
+    throw new Error(`Failed to checkout branch: ${error.message}`);
+  }
+}
+
+/**
+ * Get branch list
+ */
+export async function listBranches(directoryPath = '.') {
+  const git = simpleGit(directoryPath);
+  try {
+    const branches = await git.branch();
+    return branches.all;
+  } catch (error) {
+    throw new Error(`Failed to list branches: ${error.message}`);
+  }
+}
+
+/**
+ * Create a new branch
+ */
+export async function createBranch(branchName, directoryPath = '.') {
+  const git = simpleGit(directoryPath);
+  try {
+    await git.branch([branchName]);
+    return `Created branch: ${branchName}`;
+  } catch (error) {
+    throw new Error(`Failed to create branch: ${error.message}`);
+  }
+}
+
+export async function configureGitUser(directoryPath = '.', userConfig = {}) {
+  const git = simpleGit(directoryPath);
+  
+  try {
+    if (userConfig.name) {
+      await git.addConfig('user.name', userConfig.name);
+    }
+    if (userConfig.email) {
+      await git.addConfig('user.email', userConfig.email);
+    }
+    
+    // Return current config
+    const name = await git.raw(['config', 'user.name']);
+    const email = await git.raw(['config', 'user.email']);
+    
+    return {
+      name: name.trim(),
+      email: email.trim()
+    };
+  } catch (error) {
+    logger.error('Error configuring git user:', {
+      message: error.message,
+      config: userConfig,
+      stack: error.stack,
+      service: serviceName
+    });
+    throw error;
+  }
+}

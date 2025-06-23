@@ -309,545 +309,7 @@ async function handleConfirmationFlow(parsed, maxRetries = 4) {
   return null; // Return null to indicate failure
 }
 
-export async function handleNlpCommand(query) {
-  logger.info(`Handling NLP query: "${query}"`, { service: serviceName });
-  if (!query || query.trim() === '') {
-    console.error("NLP query cannot be empty.");
-    return;
-  }
 
-  const aiReady = await aiService.checkStatus();
-  if (!aiReady) {
-    console.error("AI service is not available. Please check your AI provider setup.");
-    
-    // Check if we have any environment variables set
-    const hasEnvConfig = process.env.MISTRAL_API_KEY || process.env.OPENAI_API_KEY || process.env.ANTHROPIC_API_KEY;
-    
-    if (!hasEnvConfig) {
-      console.log("\nTo set up GitMate, you have two options:");
-      console.log("\nOption 1 - Environment Variables (Recommended):");
-      console.log("  export AI_PROVIDER=mistral");
-      console.log("  export MISTRAL_API_KEY=your_api_key_here");
-      console.log("  # Then run: gitmate \"your command\"");
-      
-      console.log("\nOption 2 - Interactive Setup:");
-      console.log("  gitmate init");
-      console.log("  # This will guide you through configuration");
-    } else {
-      console.log("\nConfiguration issue detected. Please check your API keys.");
-    }
-    
-    logger.error("AI service not ready, aborting NLP command.", { service: serviceName });
-    return;
-  }
-
-  try {
-    let parsed = await aiService.parseIntent(query);
-    if (!parsed || parsed.intent === 'unknown') {
-      console.log("Sorry, I couldn't understand that command. Could you try rephrasing?");
-      logger.warn('NLP intent parsing failed or returned unknown.', { query, parsedResult: parsed, service: serviceName });
-      if (parsed && parsed.entities && parsed.entities.error) {
-        console.error(`Details: ${parsed.entities.error}`);
-        if(parsed.entities.raw_response) console.log(`LLM Raw: ${parsed.entities.raw_response}`);
-      }
-      return;
-    }
-
-    // Add confirmation flow
-    const confirmedParsed = await handleConfirmationFlow(parsed);
-    if (!confirmedParsed) {
-      return; // User cancelled or failed to understand
-    }
-
-    // Use the confirmed parsed result
-    parsed = confirmedParsed;
-
-    logger.info('NLP intent parsed successfully:', { intent: parsed.intent, entities: parsed.entities, service: serviceName });
-    console.log(chalk.green(`\nProceeding with: ${parsed.intent}`));
-    if (parsed.entities && Object.keys(parsed.entities).length > 0) {
-        console.log(chalk.gray('With parameters:'), JSON.stringify(parsed.entities, null, 2));
-    }
-
-    // Now, map the intent and entities to actual service calls
-    switch (parsed.intent) {
-      case 'error':
-        // Handle error intent with helpful suggestions
-        if (parsed.entities && parsed.entities.suggested_phrases) {
-          console.log(chalk.yellow("\nI couldn't understand your request clearly. Here are some suggestions:"));
-          parsed.entities.suggested_phrases.forEach((phrase, index) => {
-            console.log(chalk.cyan(`  ${index + 1}. ${phrase}`));
-          });
-          console.log(chalk.gray("\nTry rephrasing your request using one of these patterns."));
-        } else {
-          console.log(chalk.yellow("\nI couldn't understand your request. Please try rephrasing it."));
-        }
-        break;
-        
-      case 'greeting': {
-        let userName = null;
-        let isAuthenticated = false;
-        try {
-          const token = await ensureAuthenticated();
-          if (token) {
-            const profile = await githubService.getUserProfile();
-            if (profile && (profile.name || profile.login)) {
-              userName = profile.name || profile.login;
-              isAuthenticated = true;
-            }
-          }
-        } catch (e) {
-          // Not authenticated or failed to fetch user
-        }
-        if (isAuthenticated && userName) {
-          console.log(chalk.cyan(`\nHello, ${userName}! 👋\n`));
-        } else {
-          console.log(chalk.cyan("\nHello! 👋\n"));
-          console.log(chalk.yellow("To interact more with me, please login with GitHub using 'gitmate auth' or 'gitmate init'."));
-        }
-        console.log(chalk.gray("\nCreated by Sushil Kumar"));
-        break;
-      }
-      case 'create_repo':
-      case 'create_repository':
-        const tokenForCreateRepo = await ensureAuthenticated();
-        if (!tokenForCreateRepo) { process.exitCode = 1; return; }
-        const { repo_name, description, private: isPrivate } = parsed.entities;
-        if (!repo_name) {
-          console.error("Repository name is missing from the command.");
-          return;
-        }
-        await handleRepoCommand(['create', repo_name, ...(isPrivate ? ['--private'] : []), ...(description ? ['--description', description] : [])]);
-        break;
-      case 'list_repos':
-      case 'list_repositories':
-        const tokenForListRepos = await ensureAuthenticated();
-        if (!tokenForListRepos) { process.exitCode = 1; return; }
-        // Convert parsed entities to options for listUserRepositories if any
-        const listOpts = [];
-        if (parsed.entities) {
-            if (parsed.entities.visibility) listOpts.push(`type=${parsed.entities.visibility}`);
-            if (parsed.entities.sort_by) listOpts.push(`sort=${parsed.entities.sort_by}`);
-            // Add more entity to option mappings
-        }
-        await handleRepoCommand(['list', ...listOpts]);
-        break;
-      case 'git_init':
-        await handleGitCommand(['init'], '.'); // Assuming current directory
-        break;
-      case 'git_add':
-        const filesEntity = parsed.entities?.files;
-        if (filesEntity && filesEntity !== 'all' && filesEntity !== 'some' && filesEntity !== 'changes') {
-          // Specific files mentioned, add them directly
-          await handleGitCommand(['add', filesEntity], '.');
-        } else if (filesEntity === 'all') {
-          // Add all files
-          await handleGitCommand(['add', '.'], '.');
-        } else {
-          // No specific files, or "some"/"changes" -> interactive mode
-          try {
-            const status = await gitService.getStatus('.');
-            const unStagedFiles = [
-              ...status.not_added.map(f => ({ name: `${f} (Untracked)`, value: f, short: f })),
-              ...status.modified.map(f => ({ name: `${f} (Modified)`, value: f, short: f })),
-              ...status.deleted.map(f => ({ name: `${f} (Deleted)`, value: f, short: f })),
-              // Potentially add renamed, conflicted etc. if detailed status is parsed
-            ];
-
-            if (unStagedFiles.length === 0) {
-              console.log("No changes to add. Working directory clean.");
-              break;
-            }
-
-            const { filesToAdd } = await inquirer.prompt([
-              {
-                type: 'checkbox',
-                name: 'filesToAdd',
-                message: 'Select files to stage:',
-                choices: unStagedFiles,
-                pageSize: 10,
-                validate: (answer) => {
-                  if (answer.length < 1) {
-                    return 'You must choose at least one file.';
-                  }
-                  return true;
-                }
-              }
-            ]);
-
-            if (filesToAdd && filesToAdd.length > 0) {
-              await gitService.addFiles(filesToAdd, '.');
-              console.log(`Successfully staged: ${filesToAdd.join(', ')}`);
-            } else {
-              console.log("No files selected to stage.");
-            }
-          } catch (error) {
-            console.error(`Error during interactive add: ${error.message}`);
-            logger.error('Failed to interactively add files:', { message: error.message, stack: error.stack, service: serviceName });
-          }
-        }
-        break;
-      case 'git_commit':
-        const msg = parsed.entities?.commit_message;
-        if (!msg) {
-            console.error("Commit message is missing from the command.");
-            return;
-        }
-        await handleGitCommand(['commit', msg], '.');
-        break;
-      case 'push_changes': {
-        const tokenForPush = await ensureAuthenticated();
-        if (!tokenForPush) { process.exitCode = 1; return; }
-
-        let currentGitStatus;
-        try {
-            currentGitStatus = await gitService.getStatus('.');
-        } catch (error) {
-            if (error.message.includes("not a git repository")) {
-                logger.warn("Attempted push in a non-Git repository.", { path: '.', service: serviceName });
-                const initRepo = await prompter.askYesNo("This directory doesn't seem to be a Git repository. Shall I initialize one now?", false);
-                if (initRepo) {
-                    try {
-                        await gitService.initRepo('.');
-                        console.log("Successfully initialized a new Git repository here.");
-                        currentGitStatus = await gitService.getStatus('.'); // Re-fetch status
-                    } catch (initError) {
-                        logger.error("Failed to initialize Git repository:", { message: initError.message, service: serviceName });
-                        console.error(`Failed to initialize repository: ${initError.message}`);
-                        process.exitCode = 1; return;
-                    }
-                } else {
-                    console.log("Okay, a Git repository is needed to push changes. Please initialize one first.");
-                    process.exitCode = 1; return;
-                }
-            } else {
-                logger.error("Error checking Git status for push:", { message: error.message, service: serviceName });
-                console.error(`Error checking Git status: ${error.message}`);
-                process.exitCode = 1; return;
-            }
-        }
-
-        // Check for unstaged changes and handle them before pushing
-        const hasUnstagedChanges = currentGitStatus.not_added.length > 0 || 
-                                  currentGitStatus.modified.length > 0 || 
-                                  currentGitStatus.deleted.length > 0 ||
-                                  currentGitStatus.created.length > 0;
-
-        if (hasUnstagedChanges) {
-          console.log(chalk.yellow("\nYou have unstaged changes that need to be committed before pushing:"));
-          
-          // Show unstaged files
-          if (currentGitStatus.not_added.length > 0) {
-            console.log(chalk.cyan("  Untracked files:"));
-            currentGitStatus.not_added.forEach(file => console.log(`    ${file}`));
-          }
-          if (currentGitStatus.modified.length > 0) {
-            console.log(chalk.cyan("  Modified files:"));
-            currentGitStatus.modified.forEach(file => console.log(`    ${file}`));
-          }
-          if (currentGitStatus.deleted.length > 0) {
-            console.log(chalk.cyan("  Deleted files:"));
-            currentGitStatus.deleted.forEach(file => console.log(`    ${file}`));
-          }
-          if (currentGitStatus.created.length > 0) {
-            console.log(chalk.cyan("  Created files:"));
-            currentGitStatus.created.forEach(file => console.log(`    ${file}`));
-          }
-
-          // Ask which files to add
-          const allUnstagedFiles = [
-            ...currentGitStatus.not_added.map(f => ({ name: `${f} (Untracked)`, value: f, short: f })),
-            ...currentGitStatus.modified.map(f => ({ name: `${f} (Modified)`, value: f, short: f })),
-            ...currentGitStatus.deleted.map(f => ({ name: `${f} (Deleted)`, value: f, short: f })),
-            ...currentGitStatus.created.map(f => ({ name: `${f} (Created)`, value: f, short: f }))
-          ];
-
-          const { filesToAdd } = await inquirer.prompt([
-            {
-              type: 'checkbox',
-              name: 'filesToAdd',
-              message: 'Select files to stage for commit:',
-              choices: allUnstagedFiles,
-              pageSize: 10,
-              validate: (answer) => {
-                if (answer.length < 1) {
-                  return 'You must choose at least one file to commit.';
-                }
-                return true;
-              }
-            }
-          ]);
-
-          if (filesToAdd && filesToAdd.length > 0) {
-            try {
-              await gitService.addFiles(filesToAdd, '.');
-              console.log(chalk.green(`Successfully staged: ${filesToAdd.join(', ')}`));
-              
-              // Get commit message
-              const { commitMessage } = await inquirer.prompt([
-                {
-                  type: 'input',
-                  name: 'commitMessage',
-                  message: 'Enter commit message:',
-                  validate: input => input.trim() !== '' || 'Commit message cannot be empty'
-                }
-              ]);
-
-              // Commit the changes
-              await gitService.commitChanges(commitMessage, '.');
-              console.log(chalk.green(`Successfully committed with message: "${commitMessage}"`));
-              
-              // Refresh status after commit
-              currentGitStatus = await gitService.getStatus('.');
-            } catch (error) {
-              logger.error('Failed to stage and commit files:', { message: error.message, stack: error.stack, service: serviceName });
-              console.error(`Error staging and committing files: ${error.message}`);
-              process.exitCode = 1; return;
-            }
-          } else {
-            console.log(chalk.yellow("No files selected. Push cancelled."));
-            process.exitCode = 1; return;
-          }
-        }
-
-        let targetBranchName = parsed.entities?.branch;
-        let currentBranchName = currentGitStatus.current;
-        const forcePush = parsed.entities?.force === true;
-        const setAsDefault = parsed.entities?.set_as_default === true;
-        const createBackup = parsed.entities?.create_backup === true;
-
-        // Handle "current" branch - use the actual current branch
-        if (targetBranchName === 'current' || !targetBranchName) {
-            if (!currentBranchName) { // Unborn HEAD
-                 logger.warn("Could not determine current branch (unborn HEAD). Defaulting to 'main'.", { service: serviceName });
-                 targetBranchName = 'main'; // Default for unborn HEAD
-            } else {
-                targetBranchName = currentBranchName;
-            }
-            console.log(`No specific branch provided for push, will use current branch: ${targetBranchName}`);
-        }
-        
-        // Ensure target branch exists or create it
-        const localBranches = await gitService.listBranches('.');
-        const targetBranchExistsLocally = localBranches.all.includes(targetBranchName);
-
-        if (targetBranchName !== currentBranchName) {
-            if (targetBranchExistsLocally) {
-                const switchToTarget = await prompter.askYesNo(`You are on branch '${currentBranchName}', but targeting '${targetBranchName}' for push. Switch to '${targetBranchName}'?`, true);
-                if (switchToTarget) {
-                    try {
-                        await gitService.checkoutBranch(targetBranchName, '.');
-                        currentBranchName = targetBranchName; // Update current branch
-                        console.log(`Switched to branch '${targetBranchName}'.`);
-                    } catch (checkoutError) {
-                        logger.error(`Failed to checkout branch '${targetBranchName}':`, { message: checkoutError.message, service: serviceName });
-                        console.error(`Error switching to branch '${targetBranchName}': ${checkoutError.message}. Aborting push.`);
-                        process.exitCode = 1; return;
-                    }
-                } else {
-                    console.log(`Staying on branch '${currentBranchName}'. Push will target '${targetBranchName}' if you proceed with commit on current branch, or you can commit to '${targetBranchName}' after switching manually.`);
-                }
-            } else {
-                const createBranch = await prompter.askYesNo(`Branch '${targetBranchName}' does not exist locally. Create and switch to it?`, true);
-                if (createBranch) {
-                    try {
-                        await gitService.createAndCheckoutBranch(targetBranchName, '.');
-                        currentBranchName = targetBranchName; // Update current branch
-                        console.log(`Created and switched to new branch '${targetBranchName}'.`);
-                    } catch (createBranchError) {
-                        logger.error(`Failed to create branch '${targetBranchName}':`, { message: createBranchError.message, service: serviceName });
-                        console.error(`Error creating branch '${targetBranchName}': ${createBranchError.message}. Aborting push.`);
-                        process.exitCode = 1; return;
-                    }
-                } else {
-                    console.log(`Branch '${targetBranchName}' not created. Aborting push.`);
-                    process.exitCode = 1; return;
-                }
-            }
-        }
-         // At this point, currentBranchName should be the branch we intend to commit to and push.
-
-        // Create backup branch before dangerous operations
-        if (createBackup || forcePush) {
-          console.log(chalk.yellow("\nCreating backup branch before push..."));
-          const backupBranch = await createBackupBranch(currentBranchName);
-          if (!backupBranch) {
-            const proceedAnyway = await prompter.askYesNo(
-              "Failed to create backup branch. Would you like to proceed with push anyway?",
-              false
-            );
-            if (!proceedAnyway) {
-              console.log("Push cancelled by user.");
-              process.exitCode = 1;
-              return;
-            }
-          }
-        }
-
-        const remoteForPush = parsed.entities?.remote || 'origin';
-        let targetRemoteExists = false;
-        try {
-            const remotes = await gitService.getRemotes('.');
-            targetRemoteExists = remotes.some(r => r.name === remoteForPush);
-        } catch (error) {
-            logger.error("Error checking remotes:", { message: error.message, service: serviceName });
-            console.error(`Error checking repository remotes: ${error.message}`);
-            process.exitCode = 1; return;
-        }
-
-        if (!targetRemoteExists) {
-            logger.warn(`Target remote '${remoteForPush}' not found.`, { path: '.', service: serviceName });
-            const setupRemote = await prompter.askYesNo(`Remote "${remoteForPush}" is not configured. Would you like to set it up now?`, true);
-            if (setupRemote) {
-                const remoteAction = await prompter.askForChoice(
-                    'How would you like to set up the remote?',
-                    [
-                        { name: `Create a new GitHub repository and link it as "${remoteForPush}"`, value: 'create' },
-                        { name: `Link to an existing GitHub repository as "${remoteForPush}"`, value: 'link' }
-                    ]
-                );
-                if (remoteAction === 'create') {
-              const { newRepoName, isPrivate } = await inquirer.prompt([
-                { type: 'input', name: 'newRepoName', message: 'Enter name for new repository:', default: path.basename(process.cwd()) },
-                { type: 'confirm', name: 'isPrivate', message: 'Make this repository private?', default: false }
-              ]);
-              try {
-                const newRepo = await githubService.createRepository(newRepoName, { private: isPrivate });
-                await gitService.addRemote(remoteForPush, newRepo.clone_url, '.');
-                targetRemoteExists = true;
-                console.log(`Created and linked new repository: ${newRepo.html_url}`);
-              } catch (error) {
-                logger.error("Failed to create repository:", { message: error.message, service: serviceName });
-                console.error(`Failed to create repository: ${error.message}`);
-                process.exitCode = 1; return;
-              }
-            } else if (remoteAction === 'link') {
-              const { existingRepoUrl } = await inquirer.prompt([
-                { type: 'input', name: 'existingRepoUrl', message: 'Enter URL of existing repository:', validate: input => input.trim() !== '' || 'Repository URL cannot be empty' }
-                            ]);
-                            try {
-                await gitService.addRemote(remoteForPush, existingRepoUrl, '.');
-                targetRemoteExists = true;
-                console.log(`Linked to existing repository: ${existingRepoUrl}`);
-              } catch (error) {
-                logger.error("Failed to link repository:", { message: error.message, service: serviceName });
-                console.error(`Failed to link repository: ${error.message}`);
-                process.exitCode = 1; return;
-                            }
-                        } else {
-              console.log("No remote action selected. Aborting.");
-                        process.exitCode = 1; return;
-                    }
-                } else {
-            console.log(`Okay, remote "${remoteForPush}" is needed to push. Please configure it and try again.`);
-                    process.exitCode = 1; return;
-                }
-        }
-
-        // Check if branch exists on remote
-        try {
-            const remoteBranches = await gitService.listBranches('.', ['-r']);
-            const remoteBranchRef = `${remoteForPush}/${currentBranchName}`;
-            if (!remoteBranches.all.includes(remoteBranchRef)) {
-                const createRemoteBranch = await prompter.askYesNo(
-                    `Branch '${currentBranchName}' does not exist on remote '${remoteForPush}'. Create it on the remote and push?`,
-                    true
-                );
-                if (!createRemoteBranch) {
-                    console.log("Push cancelled by user.");
-                    process.exitCode = 1; return;
-                }
-            }
-        } catch (branchCheckError) {
-            logger.warn(`Could not check remote branches for '${currentBranchName}'. Proceeding with push attempt.`, { message: branchCheckError.message, service: serviceName });
-            const proceedAnyway = await prompter.askYesNo(
-                `Could not verify if branch '${currentBranchName}' exists on remote '${remoteForPush}' due to an error: ${branchCheckError.message}. Attempt to push anyway?`,
-                true
-            );
-            if (!proceedAnyway) {
-                console.log("Push cancelled by user.");
-                process.exitCode = 1; return;
-            }
-        }
-
-        try {
-          if (forcePush) {
-            const confirmForcePush = await prompter.askYesNo(
-              `WARNING: You are about to force push branch '${currentBranchName}' to '${remoteForPush}'. This will overwrite the remote branch history. Are you sure?`,
-              false
-            );
-            if (!confirmForcePush) {
-              console.log("Force push cancelled by user.");
-              process.exitCode = 1; return;
-            }
-          }
-
-          console.log(`Pushing branch '${currentBranchName}' to remote '${remoteForPush}'${forcePush ? ' (force)' : ''}...`);
-          await gitService.pushChanges(remoteForPush, currentBranchName, '.', true, forcePush);
-            console.log("Push successful.");
-
-          if (setAsDefault) {
-            const confirmSetDefault = await prompter.askYesNo(
-              `Would you like to set '${currentBranchName}' as the default branch for this repository?`,
-              true
-            );
-            if (confirmSetDefault) {
-              try {
-                await gitService.setDefaultBranch(currentBranchName, '.');
-                console.log(`Successfully set '${currentBranchName}' as the default branch.`);
-              } catch (setDefaultError) {
-                logger.error("Failed to set default branch:", { message: setDefaultError.message, service: serviceName });
-                console.error(`Failed to set default branch: ${setDefaultError.message}`);
-              }
-            }
-          }
-        } catch (pushError) {
-            logger.error("Error during push operation:", { message: pushError.message, service: serviceName });
-            console.error(`Error pushing to ${remoteForPush}/${currentBranchName}: ${pushError.message}`);
-            if (pushError.message && (pushError.message.includes('403') || pushError.message.toLowerCase().includes('permission denied'))) {
-            console.log("\nA 403 Forbidden error occurred. This usually means:");
-            console.log("1. You don't have write access to the repository");
-            console.log("2. Your GitHub token has expired or is invalid");
-            console.log("3. The repository requires branch protection rules to be followed");
-            console.log("\nPlease check your permissions and try again.");
-            } else {
-            console.log("\nCommon reasons for push failure:");
-            console.log("1. Remote branch has changes that you don't have locally");
-            console.log("2. You don't have permission to push to this branch");
-            console.log("3. The remote repository is not accessible");
-            console.log("\nTry pulling first or check your permissions.");
-            }
-        }
-        break;
-      }
-      // TODO: Implement handlers for other intents (pull_changes, create_branch, create_pr, git_status etc.)
-      case 'git_revert_last_commit':
-        const noEditRevert = parsed.entities?.no_edit === true;
-        try {
-          const message = await gitService.revertLastCommit('.', noEditRevert);
-          console.log(message);
-        } catch (error) {
-          console.error(`Error reverting last commit: ${error.message}`);
-          logger.error('Failed to revert last commit via NLP:', { message: error.message, stack: error.stack, service: serviceName });
-        }
-        break;
-      case 'create_merge_request': {
-        const sourceBranch = parsed.entities?.source_branch === 'current branch' 
-          ? await gitService.getCurrentBranch('.')
-          : parsed.entities?.source_branch;
-        const targetBranch = parsed.entities?.target_branch || 'main';
-        
-        await handleMergeRequest(sourceBranch, targetBranch);
-        break;
-      }
-      default:
-        console.log(`Intent '${parsed.intent}' is recognized but not yet implemented.`);
-        logger.info(`NLP intent '${parsed.intent}' not yet implemented.`, { service: serviceName });
-    }
-  } catch (error) {
-    console.error(`Error processing NLP query: ${error.message}`);
-    logger.error('Failed to process NLP query:', { message: error.message, stack: error.stack, query, service: serviceName });
-  }
-}
 
 export async function handleGenerateGitignore(projectDescription) {
     logger.info(`Handling .gitignore generation for: "${projectDescription}"`, { service: serviceName });
@@ -1338,5 +800,422 @@ export async function handleAuth(args) {
       UI.error('Unknown Provider', `Unknown authentication provider: ${provider}`);
       process.exitCode = 1;
       break;
+  }
+}
+
+export async function handleNlpCommand(query) {
+  logger.info(`Handling NLP query: "${query}"`, { service: serviceName });
+  if (!query || query.trim() === '') {
+    console.error("NLP query cannot be empty.");
+    return;
+  }
+
+  // First check if this is a simple conversation that doesn't need AI
+  const lowerQuery = query.toLowerCase().trim();
+  const greetings = ['hello', 'hi', 'hey', 'greetings', 'good morning', 'good afternoon', 'good evening'];
+  const thanks = ['thank', 'thanks', 'appreciate'];
+  
+  // Handle simple greetings immediately
+  if (greetings.some(g => lowerQuery.includes(g))) {
+    try {
+      const token = await ensureAuthenticated();
+      let userName = null;
+      if (token) {
+        const profile = await githubService.getUserProfile();
+        if (profile && (profile.name || profile.login)) {
+          userName = profile.name || profile.login;
+        }
+      }
+      console.log(chalk.cyan(`\n${userName ? `Hello, ${userName}! 👋` : 'Hello! 👋'}`));
+      console.log(chalk.gray("\nHow can I help you with Git today?"));
+      if (!userName) {
+        console.log(chalk.yellow("\nTip: Authenticate with GitHub for personalized experience using 'gitmate auth'"));
+      }
+      return;
+    } catch (error) {
+      // Fallback if GitHub profile fetch fails
+      console.log(chalk.cyan("\nHello! 👋\nHow can I help you with Git today?"));
+      return;
+    }
+  }
+
+  // Handle thanks immediately
+  if (thanks.some(t => lowerQuery.includes(t))) {
+    try {
+      const token = await ensureAuthenticated();
+      let userName = null;
+      if (token) {
+        const profile = await githubService.getUserProfile();
+        if (profile && (profile.name || profile.login)) {
+          userName = profile.name || profile.login;
+        }
+      }
+      console.log(chalk.green(`\n${userName ? `You're welcome, ${userName}! 😊` : 'You\'re welcome! 😊'}`));
+      console.log(chalk.gray("\nLet me know if you need any more help with Git."));
+      return;
+    } catch (error) {
+      // Fallback if GitHub profile fetch fails
+      console.log(chalk.green("\nYou're welcome! 😊\nLet me know if you need any more help with Git."));
+      return;
+    }
+  }
+
+  // Check for unrelated questions
+  const gitKeywords = ['git', 'push', 'pull', 'commit', 'branch', 'merge', 'repo'];
+  const githubKeywords = ['github', 'pull request', 'pr', 'issue'];
+  const isGitRelated = gitKeywords.some(k => lowerQuery.includes(k)) || 
+                      githubKeywords.some(k => lowerQuery.includes(k));
+
+  if (!isGitRelated) {
+    try {
+      const token = await ensureAuthenticated();
+      let userName = null;
+      if (token) {
+        const profile = await githubService.getUserProfile();
+        if (profile && (profile.name || profile.login)) {
+          userName = profile.login || profile.name;
+        }
+      }
+      console.log(chalk.yellow(`\n${userName ? `Hi ${userName},` : 'Hi there,'} I'm specialized in Git operations.`));
+      console.log(chalk.gray("I can help you with version control, repositories, and GitHub-related tasks."));
+      console.log(chalk.gray("What would you like to do with your code?"));
+      if (!userName) {
+        console.log(chalk.yellow("\nTip: Authenticate with GitHub for personalized experience using 'gitmate auth'"));
+      }
+      return;
+    } catch (error) {
+      // Fallback if GitHub profile fetch fails
+      console.log(chalk.yellow("\nHi there, I'm specialized in Git operations."));
+      console.log(chalk.gray("I can help you with version control, repositories, and GitHub-related tasks."));
+      console.log(chalk.gray("What would you like to do with your code?"));
+      return;
+    }
+  }
+
+  // Proceed with AI service for Git-related queries
+  const aiReady = await aiService.checkStatus();
+  if (!aiReady) {
+    console.error("AI service is not available. Please check your AI provider setup.");
+    
+    const hasEnvConfig = process.env.MISTRAL_API_KEY || process.env.OPENAI_API_KEY || process.env.ANTHROPIC_API_KEY;
+    
+    if (!hasEnvConfig) {
+      console.log("\nTo set up GitMate, you have two options:");
+      console.log("\nOption 1 - Environment Variables (Recommended):");
+      console.log("  export AI_PROVIDER=mistral");
+      console.log("  export MISTRAL_API_KEY=your_api_key_here");
+      console.log("  # Then run: gitmate \"your command\"");
+      
+      console.log("\nOption 2 - Interactive Setup:");
+      console.log("  gitmate init");
+      console.log("  # This will guide you through configuration");
+    } else {
+      console.log("\nConfiguration issue detected. Please check your API keys.");
+    }
+    
+    logger.error("AI service not ready, aborting NLP command.", { service: serviceName });
+    return;
+  }
+
+  try {
+    // Get user profile for personalized responses
+    let userName = null;
+    try {
+      const token = await ensureAuthenticated();
+      if (token) {
+        const profile = await githubService.getUserProfile();
+        if (profile && (profile.name || profile.login)) {
+          userName = profile.name || profile.login;
+        }
+      }
+    } catch (error) {
+      logger.warn('Failed to fetch GitHub profile', { error: error.message });
+    }
+
+    // Handle with AI service
+    const { response, requiresConfirmation, intent } = await aiService.handleUserQuery(query, userName);
+    
+    // Output the response immediately
+    console.log(chalk.cyan("\n" + response));
+
+    // Only proceed with confirmation if needed
+    if (requiresConfirmation && intent) {
+      const { confirmed } = await inquirer.prompt([
+        {
+          type: 'confirm',
+          name: 'confirmed',
+          message: 'Would you like to proceed?',
+          default: true
+        }
+      ]);
+
+      if (confirmed) {
+        console.log("INTENT", intent)
+        console.log(chalk.green(`\nProceeding with: ${intent}`));
+        // Execute the actual Git operation based on intent
+        await executeGitOperation(intent, userName);
+      } else {
+        console.log(chalk.yellow("\nOperation cancelled."));
+      }
+    }
+  } catch (error) {
+    console.error(`Error processing NLP query: ${error.message}`);
+    logger.error('Failed to process NLP query:', { 
+      message: error.message, 
+      stack: error.stack, 
+      query, 
+      service: serviceName 
+    });
+  }
+}
+
+async function executeGitOperation(intentObj, userName) {
+  const { intent, entities = {} } = intentObj;
+  console.log(chalk.blue(`\nExecuting ${intent} operation...`));
+
+  // Helper function for interactive commit message handling
+  const getCommitMessage = async (prefilledMessage = '') => {
+    const { commitMessage } = await inquirer.prompt([
+      {
+        type: 'input',
+        name: 'commitMessage',
+        message: prefilledMessage 
+          ? `Commit message (press enter to use "${prefilledMessage}" or edit):`
+          : 'Enter commit message:',
+        default: prefilledMessage,
+        validate: input => input.trim() !== '' || 'Commit message cannot be empty'
+      }
+    ]);
+    return commitMessage.trim();
+  };
+
+  try {
+    switch (intent) {
+      case 'git_commit': {
+        let commitMessage = entities.commit_message;
+        
+        if (!commitMessage) {
+          // Try to generate a commit message from diff if none provided
+          try {
+            const diff = await gitService.getDiff('.');
+            if (diff) {
+              const generatedMessage = await aiService.generateCommitMessage(diff);
+              if (generatedMessage) {
+                console.log(chalk.cyan('\nSuggested commit message:'), generatedMessage);
+              }
+            }
+          } catch (error) {
+            logger.warn('Failed to generate commit message from diff', { error: error.message });
+          }
+        }
+
+        // Get final commit message from user
+        commitMessage = await getCommitMessage(commitMessage);
+        await handleGitCommand(['commit', '-m', commitMessage], '.');
+        
+        console.log(chalk.green(`\n${userName ? `${userName}, ` : ''}Changes committed with message: "${commitMessage}"`));
+        break;
+      }
+
+      case 'git_add': {
+        const filesEntity = entities.files;
+        
+        if (filesEntity && filesEntity !== 'all' && filesEntity !== 'some' && filesEntity !== 'changes') {
+          await handleGitCommand(['add', filesEntity], '.');
+        } else {
+          // Interactive add flow
+          const status = await gitService.getStatus('.');
+          const unStagedFiles = [
+            ...status.not_added.map(f => ({ name: `${f} (Untracked)`, value: f })),
+            ...status.modified.map(f => ({ name: `${f} (Modified)`, value: f })),
+            ...status.deleted.map(f => ({ name: `${f} (Deleted)`, value: f }))
+          ];
+
+          if (unStagedFiles.length === 0) {
+            console.log(chalk.yellow('\nNo changes to add. Working directory clean.'));
+            break;
+          }
+
+          const { filesToAdd } = await inquirer.prompt([
+            {
+              type: 'checkbox',
+              name: 'filesToAdd',
+              message: 'Select files to stage:',
+              choices: [
+                new inquirer.Separator('=== Unstaged Changes ==='),
+                ...unStagedFiles,
+                new inquirer.Separator(),
+                { name: 'All Changes', value: 'all' }
+              ],
+              pageSize: Math.min(15, unStagedFiles.length + 4),
+              validate: answer => answer.length > 0 || 'You must choose at least one file.'
+            }
+          ]);
+
+          const files = filesToAdd.includes('all') ? ['.'] : filesToAdd;
+          await gitService.addFiles(files, '.');
+          
+          console.log(chalk.green(`\nSuccessfully staged ${files.length} file(s)`));
+          
+          // Offer to commit immediately
+          const shouldCommit = await prompter.askYesNo('Would you like to commit these changes now?', true);
+          if (shouldCommit) {
+            const commitMessage = await getCommitMessage();
+            await handleGitCommand(['commit', '-m', commitMessage], '.');
+            console.log(chalk.green(`\nChanges committed with message: "${commitMessage}"`));
+          }
+        }
+        break;
+      }
+
+      case 'push_changes': {
+        const token = await ensureAuthenticated();
+        if (!token) {
+          console.error(chalk.red('\nAuthentication required for push operations.'));
+          return;
+        }
+
+        // Check repository status
+        let currentStatus;
+        try {
+          currentStatus = await gitService.getStatus('.');
+        } catch (error) {
+          if (error.message.includes('not a git repository')) {
+            const shouldInit = await prompter.askYesNo(
+              'This directory is not a Git repository. Initialize one now?', 
+              true
+            );
+            if (shouldInit) {
+              await handleGitCommand(['init'], '.');
+              currentStatus = await gitService.getStatus('.');
+              console.log(chalk.green('\nInitialized new Git repository.'));
+            } else {
+              return;
+            }
+          } else {
+            throw error;
+          }
+        }
+
+        // Handle unstaged changes
+        if (currentStatus.not_added.length > 0 || currentStatus.modified.length > 0) {
+          console.log(chalk.yellow('\nYou have unstaged changes:'));
+          
+          const unstagedSummary = [
+            ...currentStatus.not_added.map(f => chalk.gray(`  ${f} (untracked)`)),
+            ...currentStatus.modified.map(f => chalk.yellow(`  ${f} (modified)`)),
+            ...currentStatus.deleted.map(f => chalk.red(`  ${f} (deleted)`))
+          ].join('\n');
+          
+          console.log(unstagedSummary);
+          
+          const shouldStage = await prompter.askYesNo(
+            'Would you like to stage and commit these changes before pushing?',
+            true
+          );
+          
+          if (shouldStage) {
+            await handleGitCommand(['add', '.'], '.');
+            
+            // Generate suggested commit message from diff
+            let suggestedMessage = '';
+            try {
+              const diff = await gitService.getDiff('--cached');
+              suggestedMessage = await aiService.generateCommitMessage(diff);
+            } catch (error) {
+              logger.warn('Failed to generate commit message', { error });
+            }
+            
+            const commitMessage = await getCommitMessage(suggestedMessage);
+            await handleGitCommand(['commit', '-m', commitMessage], '.');
+            console.log(chalk.green(`\nChanges committed with message: "${commitMessage}"`));
+            
+            // Refresh status
+            currentStatus = await gitService.getStatus('.');
+          }
+        }
+
+        // Determine target branch
+        let targetBranch = entities.branch || 'current';
+        const currentBranch = currentStatus.current || 'main';
+        
+        if (targetBranch === 'current') {
+          targetBranch = currentBranch;
+        }
+
+        // Handle branch switching if needed
+        if (targetBranch !== currentBranch) {
+          const branches = await gitService.listBranches('.');
+          
+          if (!branches.all.includes(targetBranch)) {
+            const shouldCreate = await prompter.askYesNo(
+              `Branch "${targetBranch}" doesn't exist. Create it?`,
+              true
+            );
+            
+            if (shouldCreate) {
+              await gitService.createAndCheckoutBranch(targetBranch, '.');
+              console.log(chalk.green(`\nCreated and switched to branch "${targetBranch}"`));
+            } else {
+              return;
+            }
+          } else {
+            await gitService.checkoutBranch(targetBranch, '.');
+            console.log(chalk.green(`\nSwitched to branch "${targetBranch}"`));
+          }
+        }
+
+        // Push logic
+        const remote = entities.remote || 'origin';
+        
+        try {
+          console.log(chalk.blue(`\nPushing to ${remote}/${targetBranch}...`));
+          await gitService.pushChanges(remote, targetBranch, '.', true, entities.force);
+          console.log(chalk.green('\nPush successful!'));
+          
+          // Offer to set as default branch
+          if (entities.set_as_default) {
+            const shouldSetDefault = await prompter.askYesNo(
+              `Would you like to set "${targetBranch}" as the default branch?`,
+              true
+            );
+            
+            if (shouldSetDefault) {
+              await gitService.setDefaultBranch(targetBranch, '.');
+              console.log(chalk.green(`\n"${targetBranch}" is now the default branch`));
+            }
+          }
+        } catch (pushError) {
+          console.error(chalk.red(`\nPush failed: ${pushError.message}`));
+          
+          // Provide helpful suggestions
+          if (pushError.message.includes('no upstream branch')) {
+            console.log(chalk.yellow('\nTry: git push --set-upstream origin', targetBranch));
+          } else if (pushError.message.includes('updates were rejected')) {
+            console.log(chalk.yellow('\nTry: git pull first to merge remote changes'));
+          }
+        }
+        break;
+      }
+
+      // Other cases (git_init, git_revert_last_commit, etc.) would follow similar patterns
+      // ...
+
+      default:
+        console.log(chalk.yellow(`\nOperation "${intent}" is not yet implemented.`));
+        console.log(chalk.blue('\nSupported operations: commit, add, push, init, etc.'));
+    }
+  } catch (error) {
+    console.error(chalk.red(`\n${userName ? `${userName}, ` : ''}Operation failed: ${error.message}`));
+    logger.error('Operation failed', { 
+      intent, 
+      error: error.message,
+      stack: error.stack 
+    });
+    
+    // Provide recovery suggestions
+    if (error.message.includes('merge conflict')) {
+      console.log(chalk.yellow('\nResolve conflicts and try committing again.'));
+    }
   }
 }

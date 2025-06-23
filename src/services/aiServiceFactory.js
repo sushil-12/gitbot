@@ -464,5 +464,44 @@ export const aiService = {
       - GitHub PRs/issues
       Ask me about any of these!`;
     }
+  },
+
+  async handleUserQuery(query, username = null) {
+    try {
+      // First detect the conversation type
+      const { type, response, immediate } = detectConversationType(query, username);
+
+      // If we have an immediate response, return it directly
+      if (immediate && response) {
+        return { response, requiresConfirmation: false };
+      }
+      if (immediate && type === CONVERSATION_TYPES.HELP) {
+        const helpResponse = await this.generateCommandHelp();
+        return { response: helpResponse, requiresConfirmation: false };
+      }
+
+      // For Git operations, parse the intent and prepare confirmation
+      if (type === CONVERSATION_TYPES.GIT_OPERATION || type === CONVERSATION_TYPES.GITHUB_OPERATION) {
+        const parsedIntent = await this.parseIntent(query);
+        const confirmation = await this.generateConfirmation(parsedIntent, username);
+        return { 
+          response: confirmation,
+          intent: parsedIntent,
+          requiresConfirmation: true 
+        };
+      }
+
+      // Fallback for any other cases
+      return { 
+        response: response || "I'm not sure how to help with that. I specialize in Git and GitHub operations.",
+        requiresConfirmation: false
+      };
+    } catch (error) {
+      logger.error('Error handling user query:', { message: error.message, service: serviceName });
+      return {
+        response: "Sorry, I encountered an error processing your request. Could you try again?",
+        requiresConfirmation: false
+      };
+    }
   }
 };

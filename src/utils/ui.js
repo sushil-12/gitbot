@@ -20,6 +20,7 @@ const MAX_WIDTH = Math.min(80, process.stdout.columns || 80);
 const colors = {
   primary: IS_CI ? chalk.blue : gradient.pastel,
   success: chalk.green,
+  cyan: chalk.cyan,
   warning: chalk.yellow,
   error: chalk.red,
   info: chalk.cyan,
