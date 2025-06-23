@@ -350,6 +350,7 @@ app.get('/auth/github/callback',
         error: error.message,
         stack: error.stack
       });
+      console.log(error?.message)
       res.redirect('/auth/failure');
     }
   }

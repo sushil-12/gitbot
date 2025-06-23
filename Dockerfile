@@ -14,5 +14,7 @@ COPY . .
 # Expose the port (Render sets $PORT)
 EXPOSE 3000
 
+# Add this before CMD
+RUN ls -la /app/api
 # Start the server
 CMD [ "npm", "start" ] 
