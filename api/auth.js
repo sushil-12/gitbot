@@ -7,7 +7,7 @@ import { join, dirname } from 'path';
 import { fileURLToPath } from 'url';
 import fetch from 'node-fetch'; // If using Node <18, otherwise use global fetch
 import crypto from 'crypto';
-import { logger } from '../utils/logger.js';
+import { logger } from '../src/utils/logger.js';
 
 
 const ENCRYPTION_KEY = process.env.GITBOT_SECRET_KEY; // 32 bytes for AES-256
