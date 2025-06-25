@@ -13,24 +13,24 @@ import crypto from 'crypto';
 
 // Load environment variables
 dotenv.config();
-const ENCRYPTION_KEY = "app_development_by_sushil"; // Must be the same as backend
+const ENCRYPTION_KEY = "THISISPROJECTDEVELOPEDFORLEARNINGANDATHINKINGTOMANAGEGITHUBFORFUTUREUSE"; // Must be the same as backend
 const IV_LENGTH = 16;
 
 function decrypt(text) {
-  console.log(text);
-  if (!text || typeof text !== 'string' || !text.includes(':')) return text;
-  const [ivHex, encryptedHex] = text.split(':');
-  if (!ivHex || !encryptedHex) return text; // Not encrypted
-  const iv = Buffer.from(ivHex, 'hex');
-  const encryptedText = Buffer.from(encryptedHex, 'hex');
-  console.log(ENCRYPTION_KEY);
-  const decipher = crypto.createDecipheriv('aes-256-cbc', Buffer.from(ENCRYPTION_KEY, 'utf8'), iv);
-  console.log(ENCRYPTION_KEY);
-  let decrypted = decipher.update(encryptedText);
-  console.log(encryptedText);
-  decrypted = Buffer.concat([decrypted, decipher.final()]);
-  console.log(decrypted.toString('utf8'));
-  return decrypted.toString('utf8');
+  try {
+    if (!text || typeof text !== 'string' || !text.includes(':')) return text;
+    const [ivHex, encryptedHex] = text.split(':');
+    if (!ivHex || !encryptedHex) return text; // Not encrypted
+    const iv = Buffer.from(ivHex, 'hex');
+    const encryptedText = Buffer.from(encryptedHex, 'hex');
+    const decipher = crypto.createDecipheriv('aes-256-cbc', Buffer.from(ENCRYPTION_KEY, 'utf8'), iv);
+    let decrypted = decipher.update(encryptedText);
+    decrypted = Buffer.concat([decrypted, decipher.final()]);
+    return decrypted.toString('utf8');
+  } catch (error) {
+    console.error('Decryption error:', error);
+    return null;
+  }
 }
 
 
