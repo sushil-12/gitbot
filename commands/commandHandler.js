@@ -51,7 +51,7 @@ async function ensureAuthenticated() {
     UI.error('Authentication Required', 
       'You need to authenticate with GitHub to use this feature.');
     UI.info('Please follow these steps:', 
-      `1. Open your browser and navigate to: ${authInitiateUrl}\n2. Authorize the application\n3. Paste the token below:`);
+      `1. Please open your browser and navigate to: ${authInitiateUrl}\n2. Authorize the application\n3. Paste the token below:`);
 
     const { token: enteredToken } = await inquirer.prompt([
       {
