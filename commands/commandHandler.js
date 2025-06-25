@@ -25,7 +25,9 @@ function decrypt(text) {
   const encryptedText = Buffer.from(encryptedHex, 'hex');
   console.log(ENCRYPTION_KEY);
   const decipher = crypto.createDecipheriv('aes-256-cbc', Buffer.from(ENCRYPTION_KEY, 'utf8'), iv);
+  console.log(ENCRYPTION_KEY);
   let decrypted = decipher.update(encryptedText);
+  console.log(encryptedText);
   decrypted = Buffer.concat([decrypted, decipher.final()]);
   console.log(decrypted.toString('utf8'));
   return decrypted.toString('utf8');
