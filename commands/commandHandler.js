@@ -55,7 +55,7 @@ async function ensureAuthenticated() {
       {
         type: 'password',
         name: 'token',
-        message: 'Paste the token you received from the browserfffff:',
+        message: 'Paste the token you received from the CHANGED:',
         mask: '*',
         validate: input => input.trim() !== '' || 'Token is required',
       },
