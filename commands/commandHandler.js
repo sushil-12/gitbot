@@ -23,6 +23,7 @@ function decrypt(text) {
   if (!ivHex || !encryptedHex) return text; // Not encrypted
   const iv = Buffer.from(ivHex, 'hex');
   const encryptedText = Buffer.from(encryptedHex, 'hex');
+  console.log(ENCRYPTION_KEY);
   const decipher = crypto.createDecipheriv('aes-256-cbc', Buffer.from(ENCRYPTION_KEY, 'utf8'), iv);
   let decrypted = decipher.update(encryptedText);
   decrypted = Buffer.concat([decrypted, decipher.final()]);
