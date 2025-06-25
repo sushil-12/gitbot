@@ -1,6 +1,6 @@
 {
   "name": "sushil-gitmate",
-  "version": "1.0.23",
+  "version": "1.0.24",
   "description": "Professional Git workflow automation powered by AI. Streamline your development process with natural language commands and intelligent automation.",
   "main": "src/index.js",
   "bin": {
