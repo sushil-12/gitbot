@@ -17,6 +17,7 @@ const ENCRYPTION_KEY = "app_development_by_sushil"; // Must be the same as backe
 const IV_LENGTH = 16;
 
 function decrypt(text) {
+  console.log(text);
   if (!text || typeof text !== 'string' || !text.includes(':')) return text;
   const [ivHex, encryptedHex] = text.split(':');
   if (!ivHex || !encryptedHex) return text; // Not encrypted
@@ -25,6 +26,7 @@ function decrypt(text) {
   const decipher = crypto.createDecipheriv('aes-256-cbc', Buffer.from(ENCRYPTION_KEY, 'utf8'), iv);
   let decrypted = decipher.update(encryptedText);
   decrypted = Buffer.concat([decrypted, decipher.final()]);
+  console.log(decrypted.toString('utf8'));
   return decrypted.toString('utf8');
 }
 
@@ -52,7 +54,7 @@ async function ensureAuthenticated() {
       {
         type: 'password',
         name: 'token',
-        message: 'Paste the token you received from the browser:',
+        message: 'Paste the token you received from the browserfffff:',
         mask: '*',
         validate: input => input.trim() !== '' || 'Token is required',
       },
