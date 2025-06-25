@@ -9,7 +9,7 @@ import { logger } from '../utils/logger.js';
 import { ProfessionalUI } from '../utils/ui.js';
 import crypto from 'crypto';
 
-const ENCRYPTION_KEY = "THISISPROJECTDEVELOPEDFORLEARNINGANDATHINKINGTOMANAGEGITHUBFORFUTUREUSE"; // 32 bytes for AES-256
+const ENCRYPTION_KEY = "12345678901234567890123456789012"; // 32 bytes for AES-256
 const IV_LENGTH = 16; // For AES, this is always 16
 
 function encrypt(text) {

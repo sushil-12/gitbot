@@ -13,7 +13,7 @@ import crypto from 'crypto';
 
 // Load environment variables
 dotenv.config();
-const ENCRYPTION_KEY = "THISISPROJECTDEVELOPEDFORLEARNINGANDATHINKINGTOMANAGEGITHUBFORFUTUREUSE"; // Must be the same as backend
+const ENCRYPTION_KEY = "12345678901234567890123456789012"; // Must be the same as backend
 const IV_LENGTH = 16;
 
 function decrypt(text) {

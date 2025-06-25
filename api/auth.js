@@ -10,7 +10,7 @@ import crypto from 'crypto';
 import { logger } from '../src/utils/logger.js';
 
 dotenv.config();
-const ENCRYPTION_KEY = "THISISPROJECTDEVELOPEDFORLEARNINGANDATHINKINGTOMANAGEGITHUBFORFUTUREUSE"; // 32 bytes for AES-256
+const ENCRYPTION_KEY = "12345678901234567890123456789012"; // 32 bytes for AES-256
 const IV_LENGTH = 16; // For AES, this is always 16
 
 function encrypt(text) {
