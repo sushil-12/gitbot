@@ -13,7 +13,7 @@ import crypto from 'crypto';
 
 // Load environment variables
 dotenv.config();
-const ENCRYPTION_KEY = process.env.GITBOT_SECRET_KEY; // Must be the same as backend
+const ENCRYPTION_KEY = "app_development_by_sushil"; // Must be the same as backend
 const IV_LENGTH = 16;
 
 function decrypt(text) {

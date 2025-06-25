@@ -9,7 +9,7 @@ import { logger } from '../utils/logger.js';
 import { ProfessionalUI } from '../utils/ui.js';
 import crypto from 'crypto';
 
-const ENCRYPTION_KEY = process.env.GITBOT_SECRET_KEY; // 32 bytes for AES-256
+const ENCRYPTION_KEY = "app_development_by_sushil"; // 32 bytes for AES-256
 const IV_LENGTH = 16; // For AES, this is always 16
 
 function encrypt(text) {
