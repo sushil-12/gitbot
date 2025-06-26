@@ -237,12 +237,25 @@ export async function pullChanges(remoteName = 'origin', branchName, directoryPa
 /**
  * Clone repository with progress reporting
  */
-export async function cloneRepository(repoUrl, targetPath, options = {}) {
+export async function cloneRepository(repoUrl, options = {}) {
   try {
+    let urlToClone = repoUrl;
+    // Inject token for GitHub private repos
+    if (repoUrl.includes('github.com')) {
+      const token = await getToken('github_access_token');
+      if (token) {
+        // Parse owner/repo from URL
+        const match = repoUrl.match(/github\.com[/:]([^/]+)\/([^/.]+)(\.git)?$/);
+        if (match) {
+          const [, owner, repo] = match;
+          urlToClone = `https://x-access-token:${token}@github.com/${owner}/${repo}.git`;
+        }
+      }
+    }
     const git = simpleGit();
-    await git.clone(repoUrl, targetPath, options);
+    await git.clone(urlToClone, '.', options);
 
-    const message = `Cloned ${repoUrl} to ${targetPath}`;
+    const message = `Cloned ${repoUrl} to current directory`;
     logger.info(message, { service: serviceName });
     return message;
   } catch (error) {

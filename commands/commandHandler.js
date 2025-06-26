@@ -1363,7 +1363,7 @@ async function executeGitOperation(intentObj, userName) {
       case 'clone_repo': {
         try {
           const repoUrl = entities.repo_url || (await inquirer.prompt([{ type: 'input', name: 'repo_url', message: 'Repository URL to clone:' }])).repo_url;
-          const targetPath = entities.target_path || (await inquirer.prompt([{ type: 'input', name: 'target_path', message: 'Target directory:' }])).target_path;
+          // const targetPath = entities.target_path || (await inquirer.prompt([{ type: 'input', name: 'target_path', message: 'Target directory:' }])).target_path;
           const result = await gitService.cloneRepository(repoUrl, targetPath);
           console.log(chalk.green(result));
         } catch (error) {
