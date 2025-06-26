@@ -48,9 +48,9 @@ async function ensureAuthenticated() {
     const renderAuthUrl = process.env.RENDER_AUTH_URL || 'https://gitbot-jtp2.onrender.com/auth/github';
     const authInitiateUrl = renderAuthUrl;
 
-    UI.error('Authentication Required', 
+    UI.error('Authentication Required',
       'You need to authenticate with GitHub to use this feature.');
-    UI.info('Follow these steps:', 
+    UI.info('Follow these steps:',
       `1. Please open your browser and navigate to: ${authInitiateUrl}\n2. Authorize the application\n3. Paste the token below:`);
 
     const { token: enteredToken } = await inquirer.prompt([
@@ -76,7 +76,7 @@ export async function handleRepoCommand(args) {
     process.exitCode = 1;
     return;
   }
-  
+
   const [subCommand, ...options] = args;
   logger.debug(`Handling 'repo' command: ${subCommand}`, { options, service: serviceName });
 
@@ -84,17 +84,17 @@ export async function handleRepoCommand(args) {
     case 'create': {
       const repoName = options[0];
       if (!repoName) {
-        UI.error('Repository Name Required', 
+        UI.error('Repository Name Required',
           'Please provide a repository name. Usage: repo create <repo-name> [--private] [--description "Your description"]');
         return;
       }
-      
+
       const repoOptions = {
         description: '',
         private: false,
         auto_init: true,
       };
-      
+
       for (let i = 1; i < options.length; i++) {
         if (options[i] === '--private') {
           repoOptions.private = true;
@@ -105,11 +105,11 @@ export async function handleRepoCommand(args) {
           repoOptions.auto_init = false;
         }
       }
-      
+
       try {
         UI.progress('Creating repository...');
         const repo = await githubService.createRepository(repoName, repoOptions);
-        UI.success('Repository Created Successfully', 
+        UI.success('Repository Created Successfully',
           `Repository: ${repo.full_name}\nURL: ${repo.html_url}`);
         logger.info(`Repository created: ${repo.full_name}`, { url: repo.html_url, service: serviceName });
       } catch (error) {
@@ -118,7 +118,7 @@ export async function handleRepoCommand(args) {
       }
       break;
     }
-    
+
     case 'list': {
       const listOptions = {};
       for (let i = 0; i < options.length; i++) {
@@ -131,23 +131,23 @@ export async function handleRepoCommand(args) {
           }
         }
       }
-      
+
       try {
         UI.progress('Fetching repositories...');
         const repos = await githubService.listUserRepositories(listOptions);
-        
+
         if (repos.length === 0) {
           UI.info('No repositories found', 'No repositories match your current criteria.');
         } else {
           UI.section('Your GitHub Repositories', `Found ${repos.length} repository(ies)`);
-          
+
           const repoData = repos.map(repo => ({
             Name: repo.full_name,
             Type: repo.private ? 'Private' : 'Public',
             Updated: new Date(repo.updated_at).toLocaleDateString(),
             URL: repo.html_url
           }));
-          
+
           UI.table(repoData);
         }
       } catch (error) {
@@ -156,7 +156,7 @@ export async function handleRepoCommand(args) {
       }
       break;
     }
-    
+
     default:
       UI.warning('Unknown Command', `Unknown 'repo' subcommand: ${subCommand}`);
       UI.help([
@@ -167,66 +167,66 @@ export async function handleRepoCommand(args) {
 }
 
 export async function handleGitCommand(args, currentWorkingDirectory = '.') {
-    const [subCommand, ...options] = args;
-    logger.info(`Handling 'git' command: ${subCommand} in ${currentWorkingDirectory}`, { options, service: serviceName });
+  const [subCommand, ...options] = args;
+  logger.info(`Handling 'git' command: ${subCommand} in ${currentWorkingDirectory}`, { options, service: serviceName });
 
-    switch(subCommand) {
-        case 'init':
-            try {
-                const message = await gitService.initRepo(currentWorkingDirectory);
-                console.log(message);
-            } catch (error) {
-                console.error(`Error initializing Git repository: ${error.message}`);
-            }
-            break;
-        case 'status':
-            try {
-                const status = await gitService.getStatus(currentWorkingDirectory);
-                console.log("Git Status:");
-                console.log(`  On branch: ${status.current}`);
-                console.log(`  Changes to be committed: ${status.staged.length}`);
-                status.staged.forEach(file => console.log(`    modified: ${file}`));
-                console.log(`  Changes not staged for commit: ${status.modified.length + status.not_added.length}`);
-                status.modified.forEach(file => console.log(`    modified: ${file}`));
-                status.not_added.forEach(file => console.log(`    untracked: ${file}`));
-                // Add more status details as needed
-            } catch (error) {
-                console.error(`Error getting Git status: ${error.message}`);
-            }
-            break;
-        case 'add':
-            const filesToAdd = options.length > 0 ? options : '.';
-            try {
-                await gitService.addFiles(filesToAdd, currentWorkingDirectory);
-                console.log(`Files staged: ${Array.isArray(filesToAdd) ? filesToAdd.join(', ') : filesToAdd}`);
-            } catch (error) {
-                console.error(`Error staging files: ${error.message}`);
-            }
-            break;
-        case 'commit':
-            const commitMessage = options.join(' ');
-            if (!commitMessage) {
-                console.error("Error: Commit message is required. Usage: git commit <message>");
-                return;
-            }
-            try {
-                const result = await gitService.commitChanges(commitMessage, currentWorkingDirectory);
-                console.log(`Committed: [${result.branch}] ${result.commit} - ${result.summary.changes} changes.`);
-            } catch (error) {
-                console.error(`Error committing changes: ${error.message}`);
-            }
-            break;
-        // Add more git subcommands: push, pull, branch, checkout, merge, rebase etc.
-        default:
-            logger.warn(`Unknown 'git' subcommand: ${subCommand}`, { service: serviceName });
-            console.log(`Unknown 'git' subcommand: ${subCommand}. Supported: init, status, add, commit (more to come).`);
-    }
+  switch (subCommand) {
+    case 'init':
+      try {
+        const message = await gitService.initRepo(currentWorkingDirectory);
+        console.log(message);
+      } catch (error) {
+        console.error(`Error initializing Git repository: ${error.message}`);
+      }
+      break;
+    case 'status':
+      try {
+        const status = await gitService.getStatus(currentWorkingDirectory);
+        console.log("Git Status:");
+        console.log(`  On branch: ${status.current}`);
+        console.log(`  Changes to be committed: ${status.staged.length}`);
+        status.staged.forEach(file => console.log(`    modified: ${file}`));
+        console.log(`  Changes not staged for commit: ${status.modified.length + status.not_added.length}`);
+        status.modified.forEach(file => console.log(`    modified: ${file}`));
+        status.not_added.forEach(file => console.log(`    untracked: ${file}`));
+        // Add more status details as needed
+      } catch (error) {
+        console.error(`Error getting Git status: ${error.message}`);
+      }
+      break;
+    case 'add':
+      const filesToAdd = options.length > 0 ? options : '.';
+      try {
+        await gitService.addFiles(filesToAdd, currentWorkingDirectory);
+        console.log(`Files staged: ${Array.isArray(filesToAdd) ? filesToAdd.join(', ') : filesToAdd}`);
+      } catch (error) {
+        console.error(`Error staging files: ${error.message}`);
+      }
+      break;
+    case 'commit':
+      const commitMessage = options.join(' ');
+      if (!commitMessage) {
+        console.error("Error: Commit message is required. Usage: git commit <message>");
+        return;
+      }
+      try {
+        const result = await gitService.commitChanges(commitMessage, currentWorkingDirectory);
+        console.log(`Committed: [${result.branch}] ${result.commit} - ${result.summary.changes} changes.`);
+      } catch (error) {
+        console.error(`Error committing changes: ${error.message}`);
+      }
+      break;
+    // Add more git subcommands: push, pull, branch, checkout, merge, rebase etc.
+    default:
+      logger.warn(`Unknown 'git' subcommand: ${subCommand}`, { service: serviceName });
+      console.log(`Unknown 'git' subcommand: ${subCommand}. Supported: init, status, add, commit (more to come).`);
+  }
 }
 
 async function handleConfirmationFlow(parsed, maxRetries = 4) {
   let retryCount = 0;
   let currentParsed = parsed;
-  
+
   while (retryCount < maxRetries) {
     try {
       // Generate confirmation message
@@ -234,9 +234,9 @@ async function handleConfirmationFlow(parsed, maxRetries = 4) {
       if (!confirmationMessage) {
         throw new Error('Failed to generate confirmation message');
       }
-      
+
       console.log(chalk.cyan("\n" + confirmationMessage));
-      
+
       // Ask for confirmation
       const { confirmed } = await inquirer.prompt([
         {
@@ -246,11 +246,11 @@ async function handleConfirmationFlow(parsed, maxRetries = 4) {
           default: true
         }
       ]);
-      
+
       if (confirmed) {
         return currentParsed; // Return the current parsed result
       }
-      
+
       retryCount++;
       if (retryCount < maxRetries) {
         console.log(chalk.yellow(`\nLet me try again. Please rephrase your request (attempt ${retryCount + 1}/${maxRetries}):`));
@@ -262,7 +262,7 @@ async function handleConfirmationFlow(parsed, maxRetries = 4) {
             validate: input => input.trim() !== '' || 'Please enter your request'
           }
         ]);
-        
+
         // Parse the new query
         const newParsed = await aiService.parseIntent(newQuery);
         if (newParsed && newParsed.intent !== 'unknown') {
@@ -272,13 +272,13 @@ async function handleConfirmationFlow(parsed, maxRetries = 4) {
         }
       }
     } catch (error) {
-      logger.error('Error in confirmation flow:', { 
-        message: error.message, 
+      logger.error('Error in confirmation flow:', {
+        message: error.message,
         stack: error.stack,
         retryCount,
-        service: serviceName 
+        service: serviceName
       });
-      
+
       if (retryCount < maxRetries) {
         console.log(chalk.yellow(`\nI encountered an error. Let me try again (attempt ${retryCount + 1}/${maxRetries}):`));
         const { newQuery } = await inquirer.prompt([
@@ -289,7 +289,7 @@ async function handleConfirmationFlow(parsed, maxRetries = 4) {
             validate: input => input.trim() !== '' || 'Please enter your request'
           }
         ]);
-        
+
         try {
           const newParsed = await aiService.parseIntent(newQuery);
           if (newParsed && newParsed.intent !== 'unknown') {
@@ -301,7 +301,7 @@ async function handleConfirmationFlow(parsed, maxRetries = 4) {
       }
     }
   }
-  
+
   // If we've exhausted all retries, show help
   console.log(chalk.yellow("\nI'm having trouble understanding your request. Let me show you what I can do:"));
   try {
@@ -331,120 +331,120 @@ async function handleConfirmationFlow(parsed, maxRetries = 4) {
    - "get updates from main"
     `));
   }
-  
+
   console.log(chalk.blue("\nFor more detailed documentation, visit:"));
   console.log(chalk.blue("https://github.com/yourusername/gitbot-assistant/wiki"));
-  
+
   return null; // Return null to indicate failure
 }
 
 
 
 export async function handleGenerateGitignore(projectDescription) {
-    logger.info(`Handling .gitignore generation for: "${projectDescription}"`, { service: serviceName });
-    if (!projectDescription || projectDescription.trim() === '') {
-        console.error(".gitignore project description cannot be empty.");
-        return;
+  logger.info(`Handling .gitignore generation for: "${projectDescription}"`, { service: serviceName });
+  if (!projectDescription || projectDescription.trim() === '') {
+    console.error(".gitignore project description cannot be empty.");
+    return;
+  }
+
+  const aiReady = await aiService.checkStatus();
+  if (!aiReady) {
+    console.error("AI service is not available. Please check your AI provider setup.");
+
+    // Check if we have any environment variables set
+    const hasEnvConfig = process.env.MISTRAL_API_KEY || process.env.OPENAI_API_KEY || process.env.ANTHROPIC_API_KEY;
+
+    if (!hasEnvConfig) {
+      console.log("\nTo set up GitMate, you have two options:");
+      console.log("\nOption 1 - Environment Variables (Recommended):");
+      console.log("  export AI_PROVIDER=mistral");
+      console.log("  export MISTRAL_API_KEY=your_api_key_here");
+      console.log("  # Then run: gitmate \"your command\"");
+
+      console.log("\nOption 2 - Interactive Setup:");
+      console.log("  gitmate init");
+      console.log("  # This will guide you through configuration");
+    } else {
+      console.log("\nConfiguration issue detected. Please check your API keys.");
     }
 
-    const aiReady = await aiService.checkStatus();
-    if (!aiReady) {
-        console.error("AI service is not available. Please check your AI provider setup.");
-        
-        // Check if we have any environment variables set
-        const hasEnvConfig = process.env.MISTRAL_API_KEY || process.env.OPENAI_API_KEY || process.env.ANTHROPIC_API_KEY;
-        
-        if (!hasEnvConfig) {
-            console.log("\nTo set up GitMate, you have two options:");
-            console.log("\nOption 1 - Environment Variables (Recommended):");
-            console.log("  export AI_PROVIDER=mistral");
-            console.log("  export MISTRAL_API_KEY=your_api_key_here");
-            console.log("  # Then run: gitmate \"your command\"");
-            
-            console.log("\nOption 2 - Interactive Setup:");
-            console.log("  gitmate init");
-            console.log("  # This will guide you through configuration");
-        } else {
-            console.log("\nConfiguration issue detected. Please check your API keys.");
-        }
-        
-        return;
-    }
+    return;
+  }
 
-    try {
-        const gitignoreContent = await aiService.generateGitignore(projectDescription);
-        if (gitignoreContent) {
-            console.log("\n--- Suggested .gitignore content ---\n");
-            console.log(gitignoreContent);
-            console.log("\n--- End of .gitignore content ---");
-            // TODO: Add option to write this to .gitignore file
-        } else {
-            console.log("Could not generate .gitignore content. The AI service might have returned an empty response.");
-        }
-    } catch (error) {
-        console.error(`Error generating .gitignore: ${error.message}`);
+  try {
+    const gitignoreContent = await aiService.generateGitignore(projectDescription);
+    if (gitignoreContent) {
+      console.log("\n--- Suggested .gitignore content ---\n");
+      console.log(gitignoreContent);
+      console.log("\n--- End of .gitignore content ---");
+      // TODO: Add option to write this to .gitignore file
+    } else {
+      console.log("Could not generate .gitignore content. The AI service might have returned an empty response.");
     }
+  } catch (error) {
+    console.error(`Error generating .gitignore: ${error.message}`);
+  }
 }
 
 export async function handleGenerateCommitMessage(directoryPath = '.') {
-    logger.info(`Handling commit message generation for path: "${directoryPath}"`, { service: serviceName });
+  logger.info(`Handling commit message generation for path: "${directoryPath}"`, { service: serviceName });
 
-    const aiReady = await aiService.checkStatus();
-    if (!aiReady) {
-        console.error("AI service is not available. Please check your AI provider setup.");
-        
-        // Check if we have any environment variables set
-        const hasEnvConfig = process.env.MISTRAL_API_KEY || process.env.OPENAI_API_KEY || process.env.ANTHROPIC_API_KEY;
-        
-        if (!hasEnvConfig) {
-            console.log("\nTo set up GitMate, you have two options:");
-            console.log("\nOption 1 - Environment Variables (Recommended):");
-            console.log("  export AI_PROVIDER=mistral");
-            console.log("  export MISTRAL_API_KEY=your_api_key_here");
-            console.log("  # Then run: gitmate \"your command\"");
-            
-            console.log("\nOption 2 - Interactive Setup:");
-            console.log("  gitmate init");
-            console.log("  # This will guide you through configuration");
-        } else {
-            console.log("\nConfiguration issue detected. Please check your API keys.");
-        }
-        
-        return;
+  const aiReady = await aiService.checkStatus();
+  if (!aiReady) {
+    console.error("AI service is not available. Please check your AI provider setup.");
+
+    // Check if we have any environment variables set
+    const hasEnvConfig = process.env.MISTRAL_API_KEY || process.env.OPENAI_API_KEY || process.env.ANTHROPIC_API_KEY;
+
+    if (!hasEnvConfig) {
+      console.log("\nTo set up GitMate, you have two options:");
+      console.log("\nOption 1 - Environment Variables (Recommended):");
+      console.log("  export AI_PROVIDER=mistral");
+      console.log("  export MISTRAL_API_KEY=your_api_key_here");
+      console.log("  # Then run: gitmate \"your command\"");
+
+      console.log("\nOption 2 - Interactive Setup:");
+      console.log("  gitmate init");
+      console.log("  # This will guide you through configuration");
+    } else {
+      console.log("\nConfiguration issue detected. Please check your API keys.");
     }
 
-    try {
-        const status = await gitService.getStatus(directoryPath);
-        if (status.files.length === 0) {
-            console.log("No changes to commit. Working tree clean.");
-            return;
-        }
+    return;
+  }
 
-        const git = simpleGit(directoryPath);
-        const diffOutput = await git.diff(['HEAD']);
-
-        if (!diffOutput || diffOutput.trim() === '') {
-            console.log("No diff output available. Ensure changes are staged or present in the working directory.");
-            return;
-        }
-
-        const commitMessage = await aiService.generateCommitMessage(diffOutput);
-        if (commitMessage) {
-            console.log(`\nSuggested commit message:`);
-            console.log(`"${commitMessage}"`);
-            // TODO: Add option to use this message for an actual commit
-        } else {
-            console.log("Could not generate a commit message.");
-        }
-    } catch (error) {
-        console.error(`Error generating commit message: ${error.message}`);
+  try {
+    const status = await gitService.getStatus(directoryPath);
+    if (status.files.length === 0) {
+      console.log("No changes to commit. Working tree clean.");
+      return;
     }
-    
+
+    const git = simpleGit(directoryPath);
+    const diffOutput = await git.diff(['HEAD']);
+
+    if (!diffOutput || diffOutput.trim() === '') {
+      console.log("No diff output available. Ensure changes are staged or present in the working directory.");
+      return;
+    }
+
+    const commitMessage = await aiService.generateCommitMessage(diffOutput);
+    if (commitMessage) {
+      console.log(`\nSuggested commit message:`);
+      console.log(`"${commitMessage}"`);
+      // TODO: Add option to use this message for an actual commit
+    } else {
+      console.log("Could not generate a commit message.");
+    }
+  } catch (error) {
+    console.error(`Error generating commit message: ${error.message}`);
+  }
+
 }
 
 export async function handleAuthLogout() {
-    logger.info("Handling auth logout command...", { service: serviceName });
-    try {
+  logger.info("Handling auth logout command...", { service: serviceName });
+  try {
     // Assuming clearAllTokens is more appropriate for a full logout.
     // If you only want to clear the GitHub token, use:
     // await storeToken('github_access_token', null);
@@ -452,18 +452,18 @@ export async function handleAuthLogout() {
     await clearAllTokens();
     console.log("Successfully cleared stored authentication token(s).");
     logger.info("Authentication token(s) cleared.", {
-        service: serviceName,
+      service: serviceName,
     });
-    } catch (error) {
+  } catch (error) {
     logger.error("Error during auth logout:", {
-        message: error.message,
-        stack: error.stack,
-        service: serviceName,
+      message: error.message,
+      stack: error.stack,
+      service: serviceName,
     });
     console.error(
-        "An error occurred while trying to clear authentication tokens."
+      "An error occurred while trying to clear authentication tokens."
     );
-    }
+  }
 }
 
 // Add a new command to switch AI providers
@@ -489,7 +489,7 @@ export async function handleSwitchAIProvider(provider) {
 
 async function handleMergeRequest(sourceBranch, targetBranch = 'main') {
   logger.info(`Handling merge request from ${sourceBranch} to ${targetBranch}`, { service: serviceName });
-  
+
   try {
     // 1. Check if we're in a git repository
     const isGitRepo = await gitService.isGitRepository('.');
@@ -525,7 +525,7 @@ async function handleMergeRequest(sourceBranch, targetBranch = 'main') {
       status.files.forEach(file => {
         console.log(`  ${file.path} (${file.working_dir})`);
       });
-      
+
       const shouldCommit = await prompter.askYesNo("\nWould you like to commit these changes before creating the merge request?", true);
       if (shouldCommit) {
         const { commitMessage } = await inquirer.prompt([
@@ -537,7 +537,7 @@ async function handleMergeRequest(sourceBranch, targetBranch = 'main') {
             validate: input => input.trim() !== '' || 'Commit message cannot be empty'
           }
         ]);
-        
+
         await gitService.addFiles('.', '.');
         await gitService.commitChanges(commitMessage, '.');
         console.log("Changes committed successfully.");
@@ -583,15 +583,15 @@ async function handleMergeRequest(sourceBranch, targetBranch = 'main') {
 
       // Remove .git suffix if present
       repo = repo.replace(/\.git$/, '');
-      
+
       if (!owner || !repo) {
         throw new Error('Invalid repository information: missing owner or repository name.');
       }
     } catch (error) {
-      logger.error('Failed to parse repository URL:', { 
-        url: repoInfo, 
+      logger.error('Failed to parse repository URL:', {
+        url: repoInfo,
         error: error.message,
-        service: serviceName 
+        service: serviceName
       });
       throw new Error(`Could not parse GitHub repository information: ${error.message}`);
     }
@@ -649,7 +649,7 @@ async function handleMergeRequest(sourceBranch, targetBranch = 'main') {
       console.log("1. The branches are identical");
       console.log("2. All changes from source branch are already in target branch");
       console.log("3. The source branch has no commits");
-      
+
       const showLog = await prompter.askYesNo("\nWould you like to see the commit history of both branches?", true);
       if (showLog) {
         console.log(`\n=== Commits in ${sourceBranch} ===`);
@@ -685,14 +685,14 @@ async function handleMergeRequest(sourceBranch, targetBranch = 'main') {
     // 10. Show summary and open GitHub's PR creation page
     console.log("\n=== Changes Summary ===");
     console.log(chalk.cyan(changeSummary));
-    
+
     // Construct GitHub PR URL
     const prUrl = `https://github.com/${owner}/${repo}/compare/${targetBranch}...${sourceBranch}?expand=1`;
-    
+
     console.log("\nOpening GitHub's pull request creation page...");
     console.log(chalk.blue("\nYou can also manually open this URL:"));
     console.log(chalk.blue(prUrl));
-    
+
     // Copy the summary to clipboard for easy pasting
     try {
       const clipboard = await import('clipboardy');
@@ -716,12 +716,12 @@ async function handleMergeRequest(sourceBranch, targetBranch = 'main') {
     }
 
   } catch (error) {
-    logger.error('Failed to create merge request:', { 
-      message: error.message, 
+    logger.error('Failed to create merge request:', {
+      message: error.message,
       stack: error.stack,
       sourceBranch,
       targetBranch,
-      service: serviceName 
+      service: serviceName
     });
     console.error(`Error creating merge request: ${error.message}`);
   }
@@ -729,7 +729,7 @@ async function handleMergeRequest(sourceBranch, targetBranch = 'main') {
 
 function formatDiff(diff) {
   if (!diff) return '';
-  
+
   return diff.split('\n').map(line => {
     if (line.startsWith('+')) {
       return chalk.green(line);
@@ -769,7 +769,7 @@ function displayChangesSummary(diff) {
   console.log(chalk.bold(`Total files changed: ${files.size}`));
   console.log(chalk.green(`Total additions: ${additions.length}`));
   console.log(chalk.red(`Total deletions: ${deletions.length}`));
-  
+
   console.log('\n=== Changed Files ===');
   files.forEach(file => {
     const fileAdditions = additions.filter(a => a.file === file).length;
@@ -782,7 +782,7 @@ function displayChangesSummary(diff) {
 async function createBackupBranch(currentBranch) {
   const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
   const backupBranchName = `gitmate-backup-with-${timestamp}`;
-  
+
   try {
     await gitService.createAndCheckoutBranch(backupBranchName, '.');
     await gitService.pushChanges('origin', backupBranchName, '.', true);
@@ -844,7 +844,7 @@ export async function handleNlpCommand(query) {
   const lowerQuery = query.toLowerCase().trim();
   const greetings = ['hello', 'hi', 'hey', 'greetings', 'good morning', 'good afternoon', 'good evening'];
   const thanks = ['thank', 'thanks', 'appreciate'];
-  
+
   // Handle simple greetings immediately
   if (greetings.some(g => lowerQuery.includes(g))) {
     try {
@@ -893,8 +893,8 @@ export async function handleNlpCommand(query) {
   // Check for unrelated questions
   const gitKeywords = ['git', 'push', 'pull', 'commit', 'branch', 'merge', 'repo'];
   const githubKeywords = ['github', 'pull request', 'pr', 'issue'];
-  const isGitRelated = gitKeywords.some(k => lowerQuery.includes(k)) || 
-                      githubKeywords.some(k => lowerQuery.includes(k));
+  const isGitRelated = gitKeywords.some(k => lowerQuery.includes(k)) ||
+    githubKeywords.some(k => lowerQuery.includes(k));
 
   if (!isGitRelated) {
     try {
@@ -926,23 +926,23 @@ export async function handleNlpCommand(query) {
   const aiReady = await aiService.checkStatus();
   if (!aiReady) {
     console.error("AI service is not available. Please check your AI provider setup.");
-    
+
     const hasEnvConfig = process.env.MISTRAL_API_KEY || process.env.OPENAI_API_KEY || process.env.ANTHROPIC_API_KEY;
-    
+
     if (!hasEnvConfig) {
       console.log("\nTo set up GitMate, you have two options:");
       console.log("\nOption 1 - Environment Variables (Recommended):");
       console.log("  export AI_PROVIDER=mistral");
       console.log("  export MISTRAL_API_KEY=your_api_key_here");
       console.log("  # Then run: gitmate \"your command\"");
-      
+
       console.log("\nOption 2 - Interactive Setup:");
       console.log("  gitmate init");
       console.log("  # This will guide you through configuration");
     } else {
       console.log("\nConfiguration issue detected. Please check your API keys.");
     }
-    
+
     logger.error("AI service not ready, aborting NLP command.", { service: serviceName });
     return;
   }
@@ -964,7 +964,7 @@ export async function handleNlpCommand(query) {
 
     // Handle with AI service
     const { response, requiresConfirmation, intent } = await aiService.handleUserQuery(query, userName);
-    
+
     // Output the response immediately
     console.log(chalk.cyan("\n" + response));
 
@@ -990,11 +990,11 @@ export async function handleNlpCommand(query) {
     }
   } catch (error) {
     console.error(`Error processing NLP query: ${error.message}`);
-    logger.error('Failed to process NLP query:', { 
-      message: error.message, 
-      stack: error.stack, 
-      query, 
-      service: serviceName 
+    logger.error('Failed to process NLP query:', {
+      message: error.message,
+      stack: error.stack,
+      query,
+      service: serviceName
     });
   }
 }
@@ -1003,13 +1003,62 @@ async function executeGitOperation(intentObj, userName) {
   const { intent, entities = {} } = intentObj;
   console.log(chalk.blue(`\nExecuting ${intent} operation...`));
 
+  // Normalize intent for common variants
+  let normalizedIntent = intent;
+  if ([
+    'list_repo', 'list_repos', 'list_repositories', 'list_repository'
+  ].includes(intent)) {
+    normalizedIntent = 'list_repos';
+  } else if ([
+    'create_repo', 'create_repository', 'new_repo', 'new_repository'
+  ].includes(intent)) {
+    normalizedIntent = 'create_repo';
+  } else if ([
+    'get_log', 'show_log', 'log', 'git_log'
+  ].includes(intent)) {
+    normalizedIntent = 'get_log';
+  } else if ([
+    'get_diff', 'show_diff', 'diff', 'git_diff'
+  ].includes(intent)) {
+    normalizedIntent = 'get_diff';
+  } else if ([
+    'get_status', 'show_status', 'status', 'git_status'
+  ].includes(intent)) {
+    normalizedIntent = 'git_status';
+  } else if ([
+    'add_remote', 'remote_add', 'git_add_remote'
+  ].includes(intent)) {
+    normalizedIntent = 'add_remote';
+  } else if ([
+    'get_remotes', 'list_remotes', 'remotes', 'git_remotes'
+  ].includes(intent)) {
+    normalizedIntent = 'get_remotes';
+  } else if ([
+    'get_current_branch', 'current_branch', 'show_current_branch', 'branch_current'
+  ].includes(intent)) {
+    normalizedIntent = 'get_current_branch';
+  } else if ([
+    'list_branches', 'branches', 'show_branches', 'get_branches'
+  ].includes(intent)) {
+    normalizedIntent = 'list_branches';
+  } else if ([
+    'revert_commit', 'undo_commit', 'git_revert_commit'
+  ].includes(intent)) {
+    normalizedIntent = 'revert_commit';
+  } else if ([
+    'create_and_checkout_branch', 'create_checkout_branch', 'new_and_checkout_branch'
+  ].includes(intent)) {
+    normalizedIntent = 'create_and_checkout_branch';
+  }
+  // Add more normalization rules as needed for other commands
+
   // Helper function for interactive commit message handling
   const getCommitMessage = async (prefilledMessage = '') => {
     const { commitMessage } = await inquirer.prompt([
       {
         type: 'input',
         name: 'commitMessage',
-        message: prefilledMessage 
+        message: prefilledMessage
           ? `Commit message (press enter to use "${prefilledMessage}" or edit):`
           : 'Enter commit message:',
         default: prefilledMessage,
@@ -1020,10 +1069,10 @@ async function executeGitOperation(intentObj, userName) {
   };
 
   try {
-    switch (intent) {
+    switch (normalizedIntent) {
       case 'git_commit': {
         let commitMessage = entities.commit_message;
-        
+
         if (!commitMessage) {
           // Try to generate a commit message from diff if none provided
           try {
@@ -1042,14 +1091,14 @@ async function executeGitOperation(intentObj, userName) {
         // Get final commit message from user
         commitMessage = await getCommitMessage(commitMessage);
         await handleGitCommand(['commit', '-m', commitMessage], '.');
-        
+
         console.log(chalk.green(`\n${userName ? `${userName}, ` : ''}Changes committed with message: "${commitMessage}"`));
         break;
       }
 
       case 'git_add': {
         const filesEntity = entities.files;
-        
+
         if (filesEntity && filesEntity !== 'all' && filesEntity !== 'some' && filesEntity !== 'changes') {
           await handleGitCommand(['add', filesEntity], '.');
         } else {
@@ -1084,9 +1133,9 @@ async function executeGitOperation(intentObj, userName) {
 
           const files = filesToAdd.includes('all') ? ['.'] : filesToAdd;
           await gitService.addFiles(files, '.');
-          
+
           console.log(chalk.green(`\nSuccessfully staged ${files.length} file(s)`));
-          
+
           // Offer to commit immediately
           const shouldCommit = await prompter.askYesNo('Would you like to commit these changes now?', true);
           if (shouldCommit) {
@@ -1112,7 +1161,7 @@ async function executeGitOperation(intentObj, userName) {
         } catch (error) {
           if (error.message.includes('not a git repository')) {
             const shouldInit = await prompter.askYesNo(
-              'This directory is not a Git repository. Initialize one now?', 
+              'This directory is not a Git repository. Initialize one now?',
               true
             );
             if (shouldInit) {
@@ -1130,23 +1179,23 @@ async function executeGitOperation(intentObj, userName) {
         // Handle unstaged changes
         if (currentStatus.not_added.length > 0 || currentStatus.modified.length > 0) {
           console.log(chalk.yellow('\nYou have unstaged changes:'));
-          
+
           const unstagedSummary = [
             ...currentStatus.not_added.map(f => chalk.gray(`  ${f} (untracked)`)),
             ...currentStatus.modified.map(f => chalk.yellow(`  ${f} (modified)`)),
             ...currentStatus.deleted.map(f => chalk.red(`  ${f} (deleted)`))
           ].join('\n');
-          
+
           console.log(unstagedSummary);
-          
+
           const shouldStage = await prompter.askYesNo(
             'Would you like to stage and commit these changes before pushing?',
             true
           );
-          
+
           if (shouldStage) {
             await handleGitCommand(['add', '.'], '.');
-            
+
             // Generate suggested commit message from diff
             let suggestedMessage = '';
             try {
@@ -1155,11 +1204,11 @@ async function executeGitOperation(intentObj, userName) {
             } catch (error) {
               logger.warn('Failed to generate commit message', { error });
             }
-            
+
             const commitMessage = await getCommitMessage(suggestedMessage);
             await handleGitCommand(['commit', '-m', commitMessage], '.');
             console.log(chalk.green(`\nChanges committed with message: "${commitMessage}"`));
-            
+
             // Refresh status
             currentStatus = await gitService.getStatus('.');
           }
@@ -1168,7 +1217,7 @@ async function executeGitOperation(intentObj, userName) {
         // Determine target branch
         let targetBranch = entities.branch || 'current';
         const currentBranch = currentStatus.current || 'main';
-        
+
         if (targetBranch === 'current') {
           targetBranch = currentBranch;
         }
@@ -1176,13 +1225,13 @@ async function executeGitOperation(intentObj, userName) {
         // Handle branch switching if needed
         if (targetBranch !== currentBranch) {
           const branches = await gitService.listBranches('.');
-          
+
           if (!branches.all.includes(targetBranch)) {
             const shouldCreate = await prompter.askYesNo(
               `Branch "${targetBranch}" doesn't exist. Create it?`,
               true
             );
-            
+
             if (shouldCreate) {
               await gitService.createAndCheckoutBranch(targetBranch, '.');
               console.log(chalk.green(`\nCreated and switched to branch "${targetBranch}"`));
@@ -1197,19 +1246,19 @@ async function executeGitOperation(intentObj, userName) {
 
         // Push logic
         const remote = entities.remote || 'origin';
-        
+
         try {
           console.log(chalk.blue(`\nPushing to ${remote}/${targetBranch}...`));
           await gitService.pushChanges(remote, targetBranch, '.', true, entities.force);
           console.log(chalk.green('\nPush successful!'));
-          
+
           // Offer to set as default branch
           if (entities.set_as_default) {
             const shouldSetDefault = await prompter.askYesNo(
               `Would you like to set "${targetBranch}" as the default branch?`,
               true
             );
-            
+
             if (shouldSetDefault) {
               await gitService.setDefaultBranch(targetBranch, '.');
               console.log(chalk.green(`\n"${targetBranch}" is now the default branch`));
@@ -1217,7 +1266,7 @@ async function executeGitOperation(intentObj, userName) {
           }
         } catch (pushError) {
           console.error(chalk.red(`\nPush failed: ${pushError.message}`));
-          
+
           // Provide helpful suggestions
           if (pushError.message.includes('no upstream branch')) {
             console.log(chalk.yellow('\nTry: git push --set-upstream origin', targetBranch));
@@ -1228,21 +1277,287 @@ async function executeGitOperation(intentObj, userName) {
         break;
       }
 
-      // Other cases (git_init, git_revert_last_commit, etc.) would follow similar patterns
-      // ...
+      case 'git_init': {
+        try {
+          const message = await gitService.initRepo('.');
+          console.log(chalk.green(message));
+        } catch (error) {
+          console.error(chalk.red('Error initializing repository:'), error.message);
+        }
+        break;
+      }
+      case 'git_status': {
+        try {
+          const status = await gitService.getStatus('.');
+          console.log(status);
+        } catch (error) {
+          console.error(chalk.red('Error getting status:'), error.message);
+        }
+        break;
+      }
+      case 'git_revert_last_commit': {
+        try {
+          const result = await gitService.revertCommit('HEAD', '.');
+          console.log(chalk.green(result));
+        } catch (error) {
+          console.error(chalk.red('Error reverting last commit:'), error.message);
+        }
+        break;
+      }
+      case 'pull_changes': {
+        try {
+          const remote = entities.remote || 'origin';
+          const branch = entities.branch;
+          const result = await gitService.pullChanges(remote, branch, '.');
+          console.log(chalk.green(result));
+        } catch (error) {
+          console.error(chalk.red('Error pulling changes:'), error.message);
+        }
+        break;
+      }
+      case 'create_branch': {
+        try {
+          const branchName = entities.branch || (await inquirer.prompt([{ type: 'input', name: 'branch', message: 'Branch name:' }])).branch;
+          const result = await gitService.createBranch(branchName, '.');
+          console.log(chalk.green(result));
+        } catch (error) {
+          console.error(chalk.red('Error creating branch:'), error.message);
+        }
+        break;
+      }
+      case 'checkout_branch': {
+        try {
+          const branchName = entities.branch || (await inquirer.prompt([{ type: 'input', name: 'branch', message: 'Branch to checkout:' }])).branch;
+          const result = await gitService.checkoutBranch(branchName, '.');
+          console.log(chalk.green(result));
+        } catch (error) {
+          console.error(chalk.red('Error checking out branch:'), error.message);
+        }
+        break;
+      }
+      case 'merge_branch': {
+        try {
+          const sourceBranch = entities.source_branch || (await inquirer.prompt([{ type: 'input', name: 'source_branch', message: 'Source branch to merge from:' }])).source_branch;
+          const result = await gitService.mergeBranch(sourceBranch, '.');
+          if (result.conflicts) {
+            console.log(chalk.yellow(result.message));
+            console.log('Conflicts:', result.conflicts);
+          } else {
+            console.log(chalk.green(result));
+          }
+        } catch (error) {
+          console.error(chalk.red('Error merging branch:'), error.message);
+        }
+        break;
+      }
+      case 'rebase_branch': {
+        try {
+          const baseBranch = entities.base_branch || (await inquirer.prompt([{ type: 'input', name: 'base_branch', message: 'Base branch to rebase onto:' }])).base_branch;
+          const result = await gitService.rebaseBranch(baseBranch, '.');
+          console.log(chalk.green(result));
+        } catch (error) {
+          console.error(chalk.red('Error rebasing branch:'), error.message);
+        }
+        break;
+      }
+      case 'clone_repo': {
+        try {
+          const repoUrl = entities.repo_url || (await inquirer.prompt([{ type: 'input', name: 'repo_url', message: 'Repository URL to clone:' }])).repo_url;
+          const targetPath = entities.target_path || (await inquirer.prompt([{ type: 'input', name: 'target_path', message: 'Target directory:' }])).target_path;
+          const result = await gitService.cloneRepository(repoUrl, targetPath);
+          console.log(chalk.green(result));
+        } catch (error) {
+          console.error(chalk.red('Error cloning repository:'), error.message);
+        }
+        break;
+      }
+      case 'list_branches': {
+        try {
+          const branches = await gitService.listBranches('.');
+          console.log(chalk.blue('Branches:'), branches.join(', '));
+        } catch (error) {
+          console.error(chalk.red('Error listing branches:'), error.message);
+        }
+        break;
+      }
+      case 'list_repos': {
+        try {
+          const repos = await githubService.listUserRepositories();
+          if (repos.length === 0) {
+            console.log(chalk.yellow('No repositories found.'));
+          } else {
+            repos.forEach(repo => {
+              console.log(chalk.green(repo.full_name), '-', repo.html_url);
+            });
+          }
+        } catch (error) {
+          console.error(chalk.red('Error listing repositories:'), error.message);
+        }
+        break;
+      }
+      case 'create_repo': {
+        try {
+          const name = entities.name || (await inquirer.prompt([{ type: 'input', name: 'name', message: 'Repository name:' }])).name;
+          const options = {};
+          if (!entities.private) {
+            const { isPrivate } = await inquirer.prompt([{ type: 'confirm', name: 'isPrivate', message: 'Private repository?', default: false }]);
+            options.private = isPrivate;
+          } else {
+            options.private = entities.private;
+          }
+          const { description } = await inquirer.prompt([{ type: 'input', name: 'description', message: 'Description (optional):', default: '' }]);
+          options.description = description;
+          const repo = await githubService.createRepository(name, options);
+          console.log(chalk.green('Repository created:'), repo.full_name, repo.html_url);
+        } catch (error) {
+          console.error(chalk.red('Error creating repository:'), error.message);
+        }
+        break;
+      }
+      case 'set_default_branch': {
+        try {
+          const branchName = entities.branch || (await inquirer.prompt([{ type: 'input', name: 'branch', message: 'Branch to set as default:' }])).branch;
+          const result = await gitService.setDefaultBranch(branchName, '.');
+          console.log(chalk.green(result));
+        } catch (error) {
+          console.error(chalk.red('Error setting default branch:'), error.message);
+        }
+        break;
+      }
+      case 'get_log': {
+        try {
+          const log = await gitService.getLog('.');
+          log.all.forEach(entry => {
+            console.log(chalk.yellow(entry.hash), entry.date, '-', entry.message);
+          });
+        } catch (error) {
+          console.error(chalk.red('Error getting log:'), error.message);
+        }
+        break;
+      }
+      case 'get_diff': {
+        try {
+          const diff = await gitService.getDiff('', '.');
+          console.log(diff);
+        } catch (error) {
+          console.error(chalk.red('Error getting diff:'), error.message);
+        }
+        break;
+      }
+      case 'configure_git_user': {
+        try {
+          const { name } = await inquirer.prompt([{ type: 'input', name: 'name', message: 'Git user name:' }]);
+          const { email } = await inquirer.prompt([{ type: 'input', name: 'email', message: 'Git user email:' }]);
+          const result = await gitService.configureGitUser('.', { name, email });
+          console.log(chalk.green('Git user configured:'), result);
+        } catch (error) {
+          console.error(chalk.red('Error configuring git user:'), error.message);
+        }
+        break;
+      }
+      case 'get_current_branch': {
+        try {
+          const branch = await gitService.getCurrentBranch('.');
+          console.log(chalk.blue('Current branch:'), branch);
+        } catch (error) {
+          console.error(chalk.red('Error getting current branch:'), error.message);
+        }
+        break;
+      }
+      case 'get_remotes': {
+        try {
+          const remotes = await gitService.getRemotes('.');
+          remotes.forEach(remote => {
+            console.log(chalk.blue(remote.name), '-', remote.refs.fetch);
+          });
+        } catch (error) {
+          console.error(chalk.red('Error getting remotes:'), error.message);
+        }
+        break;
+      }
+      case 'add_remote': {
+        try {
+          const { name } = await inquirer.prompt([{ type: 'input', name: 'name', message: 'Remote name:' }]);
+          const { url } = await inquirer.prompt([{ type: 'input', name: 'url', message: 'Remote URL:' }]);
+          const result = await gitService.addRemote(name, url, '.');
+          console.log(chalk.green(result));
+        } catch (error) {
+          console.error(chalk.red('Error adding remote:'), error.message);
+        }
+        break;
+      }
+      case 'get_diff_between_branches': {
+        try {
+          const sourceBranch = entities.source_branch || (await inquirer.prompt([{ type: 'input', name: 'source_branch', message: 'Source branch:' }])).source_branch;
+          const targetBranch = entities.target_branch || (await inquirer.prompt([{ type: 'input', name: 'target_branch', message: 'Target branch:' }])).target_branch;
+          const diff = await gitService.getDiffBetweenBranches(sourceBranch, targetBranch, '.');
+          console.log(diff);
+        } catch (error) {
+          console.error(chalk.red('Error getting diff between branches:'), error.message);
+        }
+        break;
+      }
+      case 'revert_commit': {
+        try {
+          const commitHash = entities.commit_hash || (await inquirer.prompt([{ type: 'input', name: 'commit_hash', message: 'Commit hash to revert:' }])).commit_hash;
+          const result = await gitService.revertCommit(commitHash, '.');
+          console.log(chalk.green(result));
+        } catch (error) {
+          console.error(chalk.red('Error reverting commit:'), error.message);
+        }
+        break;
+      }
+      case 'create_and_checkout_branch': {
+        try {
+          const branchName = entities.branch || (await inquirer.prompt([{ type: 'input', name: 'branch', message: 'Branch name:' }])).branch;
+          const result = await gitService.createAndCheckoutBranch(branchName, '.');
+          console.log(chalk.green(result));
+        } catch (error) {
+          console.error(chalk.red('Error creating and checking out branch:'), error.message);
+        }
+        break;
+      }
 
       default:
         console.log(chalk.yellow(`\nOperation "${intent}" is not yet implemented.`));
-        console.log(chalk.blue('\nSupported operations: commit, add, push, init, etc.'));
+        console.log(chalk.blue('\nSupported operations:'));
+        console.log(`
+  • git_commit           - Commit changes
+  • git_add              - Stage/add files
+  • push_changes         - Push to remote
+  • git_init             - Initialize a new repo
+  • git_status           - Show status
+  • git_revert_last_commit - Revert last commit
+  • pull_changes         - Pull from remote
+  • create_branch        - Create a branch
+  • checkout_branch      - Switch branch
+  • merge_branch         - Merge branches
+  • rebase_branch        - Rebase branches
+  • clone_repo           - Clone a repository
+  • list_branches        - List all branches
+  • list_repos           - List all repositories for the user/account
+  • create_repo          - Create a new repository
+  • set_default_branch   - Set the default branch
+  • get_log              - Show commit log/history
+  • get_diff             - Show diff
+  • configure_git_user   - Set git user config
+  • get_current_branch   - Show current branch
+  • get_remotes          - List remotes
+  • add_remote           - Add a remote
+  • get_diff_between_branches - Show diff between branches
+  • revert_commit        - Revert a specific commit
+  • create_and_checkout_branch - Create and switch to a branch
+`);
+        break;
     }
   } catch (error) {
     console.error(chalk.red(`\n${userName ? `${userName}, ` : ''}Operation failed: ${error.message}`));
-    logger.error('Operation failed', { 
-      intent, 
+    logger.error('Operation failed', {
+      intent,
       error: error.message,
-      stack: error.stack 
+      stack: error.stack
     });
-    
+
     // Provide recovery suggestions
     if (error.message.includes('merge conflict')) {
       console.log(chalk.yellow('\nResolve conflicts and try committing again.'));

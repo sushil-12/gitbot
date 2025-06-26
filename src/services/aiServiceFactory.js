@@ -68,7 +68,7 @@ async function getAnthropicClient() {
 
 async function getMistralClient() {
   if (!mistralClient) {
-    const mistralProxyUrl = process.env.MISTRAL_PROXY_URL || 'https://gitbot-jtp2.onrender.com/api/mistral';
+    const mistralProxyUrl ='https://gitbot-jtp2.onrender.com/api/mistral';
     mistralClient = {
       async chat(messages, options = {}) {
         const response = await fetch(mistralProxyUrl, {
@@ -134,70 +134,33 @@ export const aiService = {
   async checkStatus() {
     try {
       // Prefer Mistral if its API key is present
-      let provider = process.env.AI_PROVIDER;
-      let apiKey = null;
-      if (process.env.MISTRAL_API_KEY) {
-        provider = 'mistral';
-        apiKey = process.env.MISTRAL_API_KEY;
-      } else if (process.env.OPENAI_API_KEY) {
-        provider = 'openai';
-        apiKey = process.env.OPENAI_API_KEY;
-      } else if (process.env.ANTHROPIC_API_KEY) {
-        provider = 'anthropic';
-        apiKey = process.env.ANTHROPIC_API_KEY;
-      } else if (process.env.AI_PROVIDER) {
-        provider = process.env.AI_PROVIDER;
-      }
+      let provider = "mistral";
+      let apiKey = "mistral";
       
       if (apiKey) {
-        // Test the connection
-        if (provider === AI_PROVIDERS.OPENAI) {
-          const client = new OpenAI({ apiKey });
-          await client.models.list();
-        } else if (provider === AI_PROVIDERS.ANTHROPIC) {
-          const client = new Anthropic({ apiKey });
-          await client.messages.create({
-            model: 'claude-3-sonnet-20240229',
-            max_tokens: 10,
-            messages: [{ role: 'user', content: 'Hello' }]
-          });
-        } else if (provider === AI_PROVIDERS.MISTRAL) {
-          const client = await getMistralClient();
-          await client.chat([{ role: 'user', content: 'Hello' }], { max_tokens: 10 });
-        }
+        const client = await getMistralClient();
+        await client.chat([{ role: 'user', content: 'Hello' }], { max_tokens: 10 });
         return true;
       }
 
       // Check if we have local config
-      const isConfigured = await configManager.isConfigured();
-      if (!isConfigured) {
-        logger.warn('GitMate is not configured. Users can set AI_PROVIDER and API key environment variables or run "gitmate init" to set up.', { service: serviceName });
-        return false;
-      }
+      // const isConfigured = await configManager.isConfigured();
+      // if (!isConfigured) {
+      //   logger.warn('GitMate is not configured. Users can set AI_PROVIDER and API key environment variables or run "gitmate init" to set up.', { service: serviceName });
+      //   return false;
+      // }
 
-      const configProvider = await configManager.getAIProvider();
-      const configApiKey = await configManager.getAPIKey();
+      // const configProvider = await configManager.getAIProvider();
+      // const configApiKey = await configManager.getAPIKey();
       
-      if (!configApiKey) {
-        logger.warn('API key not configured. Users can set AI_PROVIDER and API key environment variables or run "gitmate init" to set up.', { service: serviceName });
-        return false;
-      }
+      // if (!configApiKey) {
+      //   logger.warn('API key not configured. Users can set AI_PROVIDER and API key environment variables or run "gitmate init" to set up.', { service: serviceName });
+      //   return false;
+      // }
 
       // Test the connection
-      if (configProvider === AI_PROVIDERS.OPENAI) {
-        const client = await getOpenAIClient();
-        await client.models.list();
-      } else if (configProvider === AI_PROVIDERS.ANTHROPIC) {
-        const client = await getAnthropicClient();
-        await client.messages.create({
-          model: 'claude-3-sonnet-20240229',
-          max_tokens: 10,
-          messages: [{ role: 'user', content: 'Hello' }]
-        });
-      } else if (configProvider === AI_PROVIDERS.MISTRAL) {
-        const client = await getMistralClient();
-        await client.chat([{ role: 'user', content: 'Hello' }], { max_tokens: 10 });
-      }
+      const client = await getMistralClient();
+      await client.chat([{ role: 'user', content: 'Hello' }], { max_tokens: 10 });
 
       return true;
     } catch (error) {
