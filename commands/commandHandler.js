@@ -1049,6 +1049,10 @@ async function executeGitOperation(intentObj, userName) {
     'create_and_checkout_branch', 'create_checkout_branch', 'new_and_checkout_branch'
   ].includes(intent)) {
     normalizedIntent = 'create_and_checkout_branch';
+  } else if ([
+    'clone_repo', 'clone_repository', 'clone', 'git_clone', 'repo_clone'
+  ].includes(intent)) {
+    normalizedIntent = 'clone_repo';
   }
   // Add more normalization rules as needed for other commands
 
