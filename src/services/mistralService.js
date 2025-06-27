@@ -8,8 +8,6 @@ const MISTRAL_API_KEY = process.env.MISTRAL_API_KEY;
 const MISTRAL_API_URL = 'https://api.mistral.ai/v1';
 const MISTRAL_MODEL = process.env.MISTRAL_MODEL || 'mistral-small';
 const MISTRAL_REQUEST_TIMEOUT = parseInt(process.env.MISTRAL_REQUEST_TIMEOUT, 10) || 120000;
-const MISTRAL_MAX_RETRIES = parseInt(process.env.MISTRAL_MAX_RETRIES, 10) || 2;
-const MISTRAL_RETRY_DELAY = parseInt(process.env.MISTRAL_RETRY_DELAY, 10) || 1000;
 
 const serviceName = 'MistralService';
 
@@ -408,21 +406,6 @@ Rules:
   });
 
   return cleanCommitMessage(response) || 'fix: code changes';
-}
-
-// Helper functions
-function createErrorResponse(message) {
-  return {
-    intent: 'error',
-    entities: {
-      error: message,
-      suggested_actions: [
-        "push to [branch]",
-        "commit with message '[message]'",
-        "create branch [name]"
-      ]
-    }
-  };
 }
 
 function cleanCommitMessage(message) {

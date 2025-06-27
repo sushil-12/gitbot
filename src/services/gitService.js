@@ -3,7 +3,6 @@ import logger from '../utils/logger.js';
 import path from 'path';
 import fs from 'fs/promises';
 import { getToken } from '../utils/tokenManager.js';
-import { getUserProfile } from './githubService.js';
 import axios from 'axios';
 import chalk from 'chalk';
 
@@ -418,7 +417,7 @@ export async function revertCommit(commitHash = 'HEAD', directoryPath = '.', opt
 /**
  * Get file status with color-coded output
  */
-export async function getStatus(directoryPath = '.', options = {}) {
+export async function getStatus(directoryPath = '.') {
   const git = simpleGit(directoryPath);
 
   try {
@@ -436,7 +435,7 @@ export async function getStatus(directoryPath = '.', options = {}) {
 /**
  * Get formatted status output for CLI display
  */
-export async function getFormattedStatus(directoryPath = '.', options = {}) {
+export async function getFormattedStatus(directoryPath = '.') {
   const git = simpleGit(directoryPath);
 
   try {
@@ -538,7 +537,7 @@ export async function setDefaultBranch(branchName, directoryPath = '.') {
 
     if (!token) throw new Error('GitHub token not available');
 
-    const response = await axios.patch(
+    await axios.patch(
       `https://api.github.com/repos/${owner}/${repo}`,
       { default_branch: branchName },
       { headers: { Authorization: `token ${token}` } }

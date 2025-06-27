@@ -331,68 +331,6 @@ process.on('SIGTERM', () => {
   process.exit(0);
 });
 
-/**
- * Parse only very clear, unambiguous commands for direct routing
- */
-function parseDirectCommand(command) {
-  // Only handle very specific, clear patterns
-  if (command === 'list' || command === 'list repos' || command === 'list repositories') {
-    return { type: 'repo', action: 'list' };
-  }
-  
-  if (command === 'status' || command === 'git status') {
-    return { type: 'git', action: 'status' };
-  }
-  
-  if (command === 'help' || command === '--help' || command === '-h') {
-    return { type: 'help' };
-  }
-  
-  if (command === 'version' || command === '--version' || command === '-v') {
-    return { type: 'version' };
-  }
-  
-  // For anything else, let AI handle it
-  return null;
-}
-
-/**
- * Route only very clear, direct commands
- */
-async function routeDirectCommand(intent, args) {
-  try {
-    switch (intent.type) {
-      case 'repo':
-        if (intent.action === 'list') {
-          await handleRepoCommand(['list']);
-        }
-        break;
-        
-      case 'git':
-        if (intent.action === 'status') {
-          await handleGitCommand(['status'], '.');
-        }
-        break;
-        
-      case 'help':
-        showHelp();
-        break;
-        
-      case 'version':
-        await showVersion();
-        break;
-        
-      default:
-        // Fallback to NLP
-        await handleNlpCommand(args.join(' '));
-    }
-  } catch (error) {
-    logger.error('Direct command routing error:', { message: error.message, intent, service: serviceName });
-    // Fallback to NLP
-    await handleNlpCommand(args.join(' '));
-  }
-}
-
 // Run the CLI
 main().catch(error => {
   logger.error('Unhandled CLI error:', { message: error.message, stack: error.stack, service: serviceName });
@@ -444,8 +382,10 @@ async function handleAiIntent(userInput) {
         break;
       case 'push_changes':
         // Use executeGitOperation for interactive commit logic
-        const { executeGitOperation } = await import('../commands/commandHandler.js');
-        await executeGitOperation({ intent, entities }, 'User');
+        {
+          const { executeGitOperation } = await import('../commands/commandHandler.js');
+          await executeGitOperation({ intent, entities }, 'User');
+        }
         break;
       case 'pull_changes':
         await handleGitCommand(['pull'], '.');

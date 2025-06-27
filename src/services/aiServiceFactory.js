@@ -71,29 +71,25 @@ async function getMistralClient() {
     const mistralProxyUrl ='https://gitbot-1-24a9.onrender.com/api/mistral';
     mistralClient = {
       async chat(messages, options = {}) {
-        try {
-          const response = await fetch(mistralProxyUrl, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ messages, options })
-          });
-          if (!response.ok) {
-            throw new Error(`Mistral Proxy error: ${response.status} ${await response.text()}`);
-          }
-          const data = await response.json();
-          
-          // Better response handling
-          if (data.choices && data.choices[0] && data.choices[0].message && data.choices[0].message.content) {
-            return data.choices[0].message.content;
-          } else if (data.choices && data.choices[0] && data.choices[0].text) {
-            return data.choices[0].text;
-          } else if (typeof data === 'string') {
-            return data;
-          } else {
-            throw new Error('Invalid response format from Mistral proxy');
-          }
-        } catch (error) {
-          throw error;
+        const response = await fetch(mistralProxyUrl, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ messages, options })
+        });
+        if (!response.ok) {
+          throw new Error(`Mistral Proxy error: ${response.status} ${await response.text()}`);
+        }
+        const data = await response.json();
+        
+        // Better response handling
+        if (data.choices && data.choices[0] && data.choices[0].message && data.choices[0].message.content) {
+          return data.choices[0].message.content;
+        } else if (data.choices && data.choices[0] && data.choices[0].text) {
+          return data.choices[0].text;
+        } else if (typeof data === 'string') {
+          return data;
+        } else {
+          throw new Error('Invalid response format from Mistral proxy');
         }
       }
     };
@@ -102,7 +98,7 @@ async function getMistralClient() {
 }
 
 // Helper function to detect conversation type
-function detectConversationType(query, username = 'there') {
+function detectConversationType(query) {
   const lowerQuery = query.toLowerCase().trim();
   
   // Greetings
@@ -202,7 +198,6 @@ export const aiService = {
   async checkStatus() {
     try {
       // Prefer Mistral if its API key is present
-      let provider = "mistral";
       let apiKey = "mistral";
       
       if (apiKey) {
@@ -445,8 +440,7 @@ export const aiService = {
         'get_diff_between_branches': `Hi ${username}, I'll show you the differences between branches. Ready to proceed?`,
         'create_and_checkout_branch': `Hi ${username}, I'll create and switch to a new branch. Ready to proceed?`,
         'git_init': `Hi ${username}, I'll initialize a new Git repository. Ready to proceed?`,
-        'git_revert_last_commit': `Hi ${username}, I'll revert the last commit. Ready to proceed?`,
-        'push_changes': `Hi ${username}, I'll push your changes. Ready to proceed?`
+        'git_revert_last_commit': `Hi ${username}, I'll revert the last commit. Ready to proceed?`
       };
 
       // Return specific message if available, otherwise generic
@@ -535,7 +529,7 @@ export const aiService = {
   async handleUserQuery(query, username = null) {
     try {
       // First detect the conversation type
-      const { type, response, immediate } = detectConversationType(query, username);
+      const { type, response, immediate } = detectConversationType(query);
 
       // If we have an immediate response, return it directly
       if (immediate && response) {

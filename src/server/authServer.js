@@ -9,20 +9,6 @@ import { logger } from '../utils/logger.js';
 import { ProfessionalUI } from '../utils/ui.js';
 import crypto from 'crypto';
 
-const ENCRYPTION_KEY = "12345678901234567890123456789012"; // 32 bytes for AES-256
-const IV_LENGTH = 16; // For AES, this is always 16
-
-function encrypt(text) {
-  let iv = crypto.randomBytes(IV_LENGTH);
-  let cipher = crypto.createCipheriv('aes-256-cbc', Buffer.from(ENCRYPTION_KEY), iv);
-  let encrypted = cipher.update(text);
-
-  encrypted = Buffer.concat([encrypted, cipher.final()]);
-
-  // Return iv + encrypted data as base64
-  return iv.toString('hex') + ':' + encrypted.toString('hex');
-}
-
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 
@@ -131,7 +117,6 @@ export class AuthServer {
       (req, res) => {
         // Successful authentication
         const user = req.user;
-        const encryptedToken = encrypt(user.accessToken);
 
         // Store tokens in config
         config.set('github.accessToken', user.accessToken);
