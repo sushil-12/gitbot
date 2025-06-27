@@ -490,7 +490,7 @@ async function generateCommitMessageFromDiff(diff) {
 /**
  * Ensure authenticated remote URL for GitHub
  */
-async function ensureAuthenticatedRemote(directoryPath = '.') {
+export async function ensureAuthenticatedRemote(directoryPath = '.') {
   const git = simpleGit(directoryPath);
 
   try {

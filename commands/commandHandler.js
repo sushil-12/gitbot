@@ -1065,7 +1065,7 @@ async function executeGitOperation(intentObj, userName) {
         type: 'input',
         name: 'commitMessage',
         message: prefilledMessage
-          ? `Commit message (press enter to use "${prefilledMessage}" or edit):`
+          ? `Commit message (press enter to use suggested or edit):`
           : 'Enter commit message:',
         default: prefilledMessage,
         validate: input => input.trim() !== '' || 'Commit message cannot be empty'
@@ -1200,7 +1200,32 @@ async function executeGitOperation(intentObj, userName) {
           );
 
           if (shouldStage) {
-            await handleGitCommand(['add', '.'], '.');
+            // Interactive file selection instead of automatic staging
+            const unStagedFiles = [
+              ...currentStatus.not_added.map(f => ({ name: `${f} (Untracked)`, value: f })),
+              ...currentStatus.modified.map(f => ({ name: `${f} (Modified)`, value: f })),
+              ...currentStatus.deleted.map(f => ({ name: `${f} (Deleted)`, value: f }))
+            ];
+
+            const { filesToAdd } = await inquirer.prompt([
+              {
+                type: 'checkbox',
+                name: 'filesToAdd',
+                message: 'Select files to stage for commit:',
+                choices: [
+                  new inquirer.Separator('=== Unstaged Changes ==='),
+                  ...unStagedFiles,
+                  new inquirer.Separator(),
+                  { name: 'All Changes', value: 'all' }
+                ],
+                pageSize: Math.min(15, unStagedFiles.length + 4),
+                validate: answer => answer.length > 0 || 'You must choose at least one file.'
+              }
+            ]);
+
+            const files = filesToAdd.includes('all') ? ['.'] : filesToAdd;
+            await gitService.addFiles(files, '.');
+            console.log(chalk.green(`\nStaged ${files.length} file(s) for commit`));
 
             // Generate suggested commit message from diff
             let suggestedMessage = '';
@@ -1211,9 +1236,21 @@ async function executeGitOperation(intentObj, userName) {
               logger.warn('Failed to generate commit message', { error });
             }
 
-            const commitMessage = await getCommitMessage(suggestedMessage);
-            await handleGitCommand(['commit', '-m', commitMessage], '.');
-            console.log(chalk.green(`\nChanges committed with message: "${commitMessage}"`));
+            // Improved commit message handling
+            const { commitMessage } = await inquirer.prompt([
+              {
+                type: 'input',
+                name: 'commitMessage',
+                message: suggestedMessage
+                  ? `Commit message (press enter to use suggested or edit):`
+                  : 'Enter commit message:',
+                default: suggestedMessage || '',
+                validate: input => input.trim() !== '' || 'Commit message cannot be empty'
+              }
+            ]);
+
+            await handleGitCommand(['commit', '-m', commitMessage.trim()], '.');
+            console.log(chalk.green(`\nChanges committed with message: "${commitMessage.trim()}"`));
 
             // Refresh status
             currentStatus = await gitService.getStatus('.');
@@ -1254,8 +1291,12 @@ async function executeGitOperation(intentObj, userName) {
         const remote = entities.remote || 'origin';
 
         try {
+          // Ensure remote is authenticated before pushing
+          console.log(chalk.blue(`\nSetting up authentication for ${remote}...`));
+          await gitService.ensureAuthenticatedRemote('.');
+          
           console.log(chalk.blue(`\nPushing to ${remote}/${targetBranch}...`));
-          await gitService.pushChanges(remote, targetBranch, '.', true, entities.force);
+          await gitService.pushChanges(remote, targetBranch, '.', { setUpstream: true, force: entities.force });
           console.log(chalk.green('\nPush successful!'));
 
           // Offer to set as default branch
