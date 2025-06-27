@@ -71,16 +71,32 @@ async function getMistralClient() {
     const mistralProxyUrl ='https://gitbot-jtp2.onrender.com/api/mistral';
     mistralClient = {
       async chat(messages, options = {}) {
-        const response = await fetch(mistralProxyUrl, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ messages, options })
-        });
-        if (!response.ok) {
-          throw new Error(`Mistral Proxy error: ${response.status} ${await response.text()}`);
+        try {
+          const response = await fetch(mistralProxyUrl, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ messages, options })
+          });
+          if (!response.ok) {
+            throw new Error(`Mistral Proxy error: ${response.status} ${await response.text()}`);
+          }
+          const data = await response.json();
+          
+          // Better response handling
+          if (data.choices && data.choices[0] && data.choices[0].message && data.choices[0].message.content) {
+            return data.choices[0].message.content;
+          } else if (data.choices && data.choices[0] && data.choices[0].text) {
+            return data.choices[0].text;
+          } else if (typeof data === 'string') {
+            return data;
+          } else {
+            console.error('Unexpected Mistral response format:', data);
+            throw new Error('Invalid response format from Mistral proxy');
+          }
+        } catch (error) {
+          console.error('Mistral client error:', error);
+          throw error;
         }
-        const data = await response.json();
-        return data.choices?.[0]?.message?.content || data.choices?.[0]?.text || data;
       }
     };
   }
@@ -280,6 +296,45 @@ export const aiService = {
         return aiResponseCache.get(cacheKey);
       }
 
+      // Simple fallback for common commands before trying AI
+      const lowerQuery = query.toLowerCase().trim();
+      
+      // Push commands
+      if (lowerQuery.includes('push')) {
+        const entities = {};
+        if (lowerQuery.includes('main')) entities.branch = 'main';
+        if (lowerQuery.includes('force')) entities.force = true;
+        if (lowerQuery.includes('origin')) entities.remote = 'origin';
+        
+        return { 
+          intent: 'push_changes', 
+          entities: { ...entities, branch: entities.branch || 'current', remote: entities.remote || 'origin' },
+          confidence: 0.9
+        };
+      }
+      
+      // Commit commands
+      if (lowerQuery.includes('commit')) {
+        const entities = {};
+        const messageMatch = query.match(/['"]([^'"]+)['"]/);
+        if (messageMatch) entities.commit_message = messageMatch[1];
+        
+        return { 
+          intent: 'git_commit', 
+          entities,
+          confidence: 0.9
+        };
+      }
+      
+      // Status commands
+      if (lowerQuery.includes('status')) {
+        return { 
+          intent: 'git_status', 
+          entities: {},
+          confidence: 0.9
+        };
+      }
+
       const prompt = `Analyze this Git/GitHub command and extract the intent and entities. Return a JSON object with:
       - intent: The main action (push_changes, create_branch, git_commit, create_pr, etc.)
       - entities: Object with relevant parameters (branch, commit_message, files, etc.)
@@ -289,7 +344,9 @@ export const aiService = {
       
       Return only valid JSON:`;
 
+      console.log('Sending prompt to AI:', prompt);
       const response = await this.generateResponse(prompt, { max_tokens: 500, temperature: 0.2 });
+      console.log('AI response:', response);
       
       let parsed;
       try {
@@ -302,8 +359,20 @@ export const aiService = {
         }
         parsed = JSON.parse(jsonContent);
       } catch (parseError) {
-        logger.error('Failed to parse AI response as JSON:', { response, error: parseError.message, service: serviceName });
-        parsed = { intent: 'unknown', entities: { error: 'Failed to parse response' } };
+        console.error('Failed to parse AI response as JSON:', { response, error: parseError.message });
+        
+        // Try to extract JSON from the response
+        const jsonMatch = response.match(/\{[\s\S]*\}/);
+        if (jsonMatch) {
+          try {
+            parsed = JSON.parse(jsonMatch[0]);
+          } catch (secondError) {
+            console.error('Failed to parse extracted JSON:', secondError);
+            parsed = { intent: 'unknown', entities: { error: 'Failed to parse response' } };
+          }
+        } else {
+          parsed = { intent: 'unknown', entities: { error: 'Failed to parse response' } };
+        }
       }
 
       // Add default values for common entities

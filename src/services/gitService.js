@@ -423,6 +423,24 @@ export async function getStatus(directoryPath = '.', options = {}) {
 
   try {
     const status = await git.status();
+    
+    // Return the raw status object for programmatic use
+    return status;
+  } catch (error) {
+    const errMsg = `Failed to get status: ${error.message}`;
+    logger.error(errMsg, { stack: error.stack, service: serviceName });
+    throw new Error(errMsg);
+  }
+}
+
+/**
+ * Get formatted status output for CLI display
+ */
+export async function getFormattedStatus(directoryPath = '.', options = {}) {
+  const git = simpleGit(directoryPath);
+
+  try {
+    const status = await git.status();
 
     // Format for CLI output
     const formatFileList = (files, color) =>

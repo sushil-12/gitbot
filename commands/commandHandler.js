@@ -190,15 +190,8 @@ export async function handleGitCommand(args, currentWorkingDirectory = '.') {
       break;
     case 'status':
       try {
-        const status = await gitService.getStatus(currentWorkingDirectory);
-        console.log("Git Status:");
-        console.log(`  On branch: ${status.current}`);
-        console.log(`  Changes to be committed: ${status.staged.length}`);
-        status.staged.forEach(file => console.log(`    modified: ${file}`));
-        console.log(`  Changes not staged for commit: ${status.modified.length + status.not_added.length}`);
-        status.modified.forEach(file => console.log(`    modified: ${file}`));
-        status.not_added.forEach(file => console.log(`    untracked: ${file}`));
-        // Add more status details as needed
+        const formattedStatus = await gitService.getFormattedStatus(currentWorkingDirectory);
+        console.log(formattedStatus);
       } catch (error) {
         console.error(`Error getting Git status: ${error.message}`);
       }
