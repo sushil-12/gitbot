@@ -496,25 +496,44 @@ export async function ensureAuthenticatedRemote(directoryPath = '.') {
   try {
     const remotes = await git.getRemotes(true);
     const origin = remotes.find(r => r.name === 'origin');
-    if (!origin) return;
+    if (!origin) {
+      console.log(chalk.yellow('No origin remote found'));
+      return;
+    }
 
-    // Already authenticated
-    if (origin.refs.fetch.includes('@github.com')) return;
+    console.log(chalk.blue(`Current origin URL: ${origin.refs.fetch}`));
+
+    // Check if already properly authenticated
+    if (origin.refs.fetch.includes('x-access-token:') && origin.refs.fetch.includes('@github.com')) {
+      console.log(chalk.green('Origin is already authenticated'));
+      return;
+    }
 
     const token = await getToken('github_access_token');
-    if (!token) return;
+    if (!token) {
+      console.log(chalk.red('No GitHub access token found. Please authenticate first.'));
+      return;
+    }
 
     // Parse repository info
     const urlMatch = origin.refs.fetch.match(/github\.com[/:]([^/]+)\/([^/.]+)(\.git)?$/);
-    if (!urlMatch) return;
+    if (!urlMatch) {
+      console.log(chalk.yellow('Could not parse GitHub URL from origin'));
+      return;
+    }
 
     const [, owner, repo] = urlMatch;
     const username = 'x-access-token';
     const newUrl = `https://${username}:${token}@github.com/${owner}/${repo}.git`;
 
+    console.log(chalk.blue(`Updating origin URL to: https://${username}:***@github.com/${owner}/${repo}.git`));
+    
     await git.remote(['set-url', 'origin', newUrl]);
+    console.log(chalk.green('Successfully updated origin with authenticated URL'));
+    
     logger.info(`Updated origin with authenticated URL`, { service: serviceName });
   } catch (error) {
+    console.error(chalk.red(`Failed to update remote URL: ${error.message}`));
     logger.warn('Failed to update remote URL', { error: error.message });
   }
 }

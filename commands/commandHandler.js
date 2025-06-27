@@ -1139,8 +1139,10 @@ async function executeGitOperation(intentObj, userName) {
 
           const files = filesToAdd.includes('all') ? ['.'] : filesToAdd;
           await gitService.addFiles(files, '.');
-
-          console.log(chalk.green(`\nSuccessfully staged ${files.length} file(s)`));
+          
+          // Fix file counting - if "all" was selected, count the actual files
+          const actualFileCount = filesToAdd.includes('all') ? unStagedFiles.length : filesToAdd.length;
+          console.log(chalk.green(`\nStaged ${actualFileCount} file(s) for commit`));
 
           // Offer to commit immediately
           const shouldCommit = await prompter.askYesNo('Would you like to commit these changes now?', true);
@@ -1225,7 +1227,10 @@ async function executeGitOperation(intentObj, userName) {
 
             const files = filesToAdd.includes('all') ? ['.'] : filesToAdd;
             await gitService.addFiles(files, '.');
-            console.log(chalk.green(`\nStaged ${files.length} file(s) for commit`));
+            
+            // Fix file counting - if "all" was selected, count the actual files
+            const actualFileCount = filesToAdd.includes('all') ? unStagedFiles.length : filesToAdd.length;
+            console.log(chalk.green(`\nStaged ${actualFileCount} file(s) for commit`));
 
             // Generate suggested commit message from diff
             let suggestedMessage = '';
@@ -1294,6 +1299,13 @@ async function executeGitOperation(intentObj, userName) {
           // Ensure remote is authenticated before pushing
           console.log(chalk.blue(`\nSetting up authentication for ${remote}...`));
           await gitService.ensureAuthenticatedRemote('.');
+          
+          // Verify the remote URL was updated
+          const remotes = await gitService.getRemotes('.');
+          const origin = remotes.find(r => r.name === 'origin');
+          if (origin) {
+            console.log(chalk.blue(`Final origin URL: ${origin.refs.fetch}`));
+          }
           
           console.log(chalk.blue(`\nPushing to ${remote}/${targetBranch}...`));
           await gitService.pushChanges(remote, targetBranch, '.', { setUpstream: true, force: entities.force });
