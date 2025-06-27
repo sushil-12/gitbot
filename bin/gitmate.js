@@ -84,9 +84,18 @@ async function main() {
         await handleAuthLogout();
         break;
         
+      case 'list':
+        // Handle list command - route to repo list functionality
+        await handleRepoCommand(['list', ...args.slice(1)]);
+        break;
+        
+      case 'status':
+        await handleGitCommand(['status'], '.');
+        break;
+        
       default:
-        // Treat as NLP command
-        await handleNlpCommand(command + ' ' + args.slice(1).join(' '));
+        // For all other commands, use AI to parse intent and route
+        await handleAiIntent(command + ' ' + args.slice(1).join(' '));
         break;
     }
   } catch (error) {
@@ -115,6 +124,7 @@ COMMANDS:
   init                    Initialize GitBot Assistant configuration
   config [options]        Manage configuration settings
   auth <provider>         Authenticate with external services
+  list                    List your GitHub repositories
   repo <subcommand>       Manage GitHub repositories
   git <subcommand>        Execute Git operations
   generate-commit-message Generate commit message from changes
@@ -127,6 +137,7 @@ NATURAL LANGUAGE COMMANDS:
   gitmate "create a new branch called feature-x"
   gitmate "commit with message 'fix bug'"
   gitmate "create merge request from feature to main"
+  gitmate "list all of my repos"
 
 OPTIONS:
   -h, --help     Show this help message
@@ -135,6 +146,8 @@ OPTIONS:
 EXAMPLES:
   gitmate init
   gitmate config --show
+  gitmate list
+  gitmate "list all of my repos"
   gitmate "push code please"
   gitmate repo create my-project --private
 
@@ -303,9 +316,146 @@ process.on('SIGTERM', () => {
   process.exit(0);
 });
 
+/**
+ * Parse only very clear, unambiguous commands for direct routing
+ */
+function parseDirectCommand(command) {
+  // Only handle very specific, clear patterns
+  if (command === 'list' || command === 'list repos' || command === 'list repositories') {
+    return { type: 'repo', action: 'list' };
+  }
+  
+  if (command === 'status' || command === 'git status') {
+    return { type: 'git', action: 'status' };
+  }
+  
+  if (command === 'help' || command === '--help' || command === '-h') {
+    return { type: 'help' };
+  }
+  
+  if (command === 'version' || command === '--version' || command === '-v') {
+    return { type: 'version' };
+  }
+  
+  // For anything else, let AI handle it
+  return null;
+}
+
+/**
+ * Route only very clear, direct commands
+ */
+async function routeDirectCommand(intent, args) {
+  try {
+    switch (intent.type) {
+      case 'repo':
+        if (intent.action === 'list') {
+          await handleRepoCommand(['list']);
+        }
+        break;
+        
+      case 'git':
+        if (intent.action === 'status') {
+          await handleGitCommand(['status'], '.');
+        }
+        break;
+        
+      case 'help':
+        showHelp();
+        break;
+        
+      case 'version':
+        await showVersion();
+        break;
+        
+      default:
+        // Fallback to NLP
+        await handleNlpCommand(args.join(' '));
+    }
+  } catch (error) {
+    logger.error('Direct command routing error:', { message: error.message, intent, service: serviceName });
+    // Fallback to NLP
+    await handleNlpCommand(args.join(' '));
+  }
+}
+
 // Run the CLI
 main().catch(error => {
   logger.error('Unhandled CLI error:', { message: error.message, stack: error.stack, service: serviceName });
   UI.error('Fatal Error', error.message);
   process.exit(1);
-}); 
+});
+
+async function handleAiIntent(userInput) {
+  try {
+    const { aiService } = await import('../src/services/aiServiceFactory.js');
+    
+    // Check AI service status first
+    const aiReady = await aiService.checkStatus();
+    
+    if (!aiReady) {
+      console.log('\nAI service is not available. Please check your configuration.');
+      return;
+    }
+    
+    const { intent, entities, confidence } = await aiService.parseIntent(userInput);
+    
+    // If confidence is low or intent is unknown, show help or ask for clarification
+    if (!intent || intent === 'unknown' || (confidence !== undefined && confidence < 0.5)) {
+      console.log('\nSorry, I could not confidently understand your request. Here are some things you can try:');
+      showHelp();
+      return;
+    }
+    // Route to the correct handler based on intent
+    switch (intent) {
+      case 'git_status':
+        await handleGitCommand(['status'], '.');
+        break;
+      case 'list_branches':
+        await handleGitCommand(['branch'], '.');
+        break;
+      case 'list_repos':
+        await handleRepoCommand(['list']);
+        break;
+      case 'get_remotes':
+      case 'list_remotes':
+      case 'git_remote':
+        await handleGitCommand(['remote'], '.');
+        break;
+      case 'git_log':
+        await handleGitCommand(['log'], '.');
+        break;
+      case 'git_diff':
+        await handleGitCommand(['diff'], '.');
+        break;
+      case 'push_changes':
+        await handleGitCommand(['push'], '.');
+        break;
+      case 'pull_changes':
+        await handleGitCommand(['pull'], '.');
+        break;
+      case 'create_branch':
+        await handleGitCommand(['branch', entities?.branch || 'new-branch'], '.');
+        break;
+      case 'checkout_branch':
+        await handleGitCommand(['checkout', entities?.branch || 'main'], '.');
+        break;
+      case 'git_commit':
+        await handleGitCommand(['commit', entities?.commit_message || 'Update'], '.');
+        break;
+      case 'add_remote':
+        await handleGitCommand(['remote', 'add', entities?.name, entities?.url], '.');
+        break;
+      case 'clone_repo':
+        await handleGitCommand(['clone', entities?.repo_url], '.');
+        break;
+      // Add more intent handlers as needed
+      default:
+        // If intent is not mapped, fallback to NLP handler for conversational response
+        await handleNlpCommand(userInput);
+    }
+  } catch (error) {
+    logger.error('AI intent routing error:', { message: error.message, stack: error.stack, userInput, service: serviceName });
+    UI.error('AI Routing Error', error.message + (error.stack ? '\n' + error.stack : ''));
+    console.error('Full AI Routing Error:', error);
+  }
+} 

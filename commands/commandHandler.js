@@ -218,10 +218,81 @@ export async function handleGitCommand(args, currentWorkingDirectory = '.') {
         console.error(`Error committing changes: ${error.message}`);
       }
       break;
+    case 'branch':
+      try {
+        const branches = await gitService.listBranches(currentWorkingDirectory);
+        console.log(chalk.blue('Branches:'), branches.join(', '));
+      } catch (error) {
+        console.error(`Error listing branches: ${error.message}`);
+      }
+      break;
+    case 'remote':
+      try {
+        const remotes = await gitService.getRemotes(currentWorkingDirectory);
+        if (remotes.length === 0) {
+          console.log(chalk.yellow('No remotes configured.'));
+        } else {
+          console.log(chalk.blue('Remotes:'));
+          remotes.forEach(remote => {
+            console.log(`  ${remote.name}: ${remote.refs.fetch}`);
+          });
+        }
+      } catch (error) {
+        console.error(`Error listing remotes: ${error.message}`);
+      }
+      break;
+    case 'log':
+      try {
+        const log = await gitService.getLog(currentWorkingDirectory);
+        log.all.forEach(entry => {
+          console.log(chalk.yellow(entry.hash), entry.date, '-', entry.message);
+        });
+      } catch (error) {
+        console.error(`Error getting log: ${error.message}`);
+      }
+      break;
+    case 'diff':
+      try {
+        const diff = await gitService.getDiff(options.join(' '), currentWorkingDirectory);
+        console.log(diff);
+      } catch (error) {
+        console.error(`Error getting diff: ${error.message}`);
+      }
+      break;
+    case 'push':
+      try {
+        const remoteName = options[0] || 'origin';
+        const branchName = options[1];
+        const pushOptions = {};
+        
+        // Parse push options
+        if (options.includes('--set-upstream') || options.includes('-u')) {
+          pushOptions.setUpstream = true;
+        }
+        if (options.includes('--force') || options.includes('-f')) {
+          pushOptions.force = true;
+        }
+        
+        const result = await gitService.pushChanges(remoteName, branchName, currentWorkingDirectory, pushOptions);
+        console.log(result);
+      } catch (error) {
+        console.error(`Error pushing changes: ${error.message}`);
+      }
+      break;
+    case 'pull':
+      try {
+        const remoteName = options[0] || 'origin';
+        const branchName = options[1];
+        const result = await gitService.pullChanges(remoteName, branchName, currentWorkingDirectory);
+        console.log(result);
+      } catch (error) {
+        console.error(`Error pulling changes: ${error.message}`);
+      }
+      break;
     // Add more git subcommands: push, pull, branch, checkout, merge, rebase etc.
     default:
       logger.warn(`Unknown 'git' subcommand: ${subCommand}`, { service: serviceName });
-      console.log(`Unknown 'git' subcommand: ${subCommand}. Supported: init, status, add, commit (more to come).`);
+      console.log(`Unknown 'git' subcommand: ${subCommand}. Supported: init, status, add, commit, branch, remote, log, diff, push, pull (more to come).`);
   }
 }
 
@@ -972,23 +1043,13 @@ export async function handleNlpCommand(query) {
 
     // Only proceed with confirmation if needed
     if (requiresConfirmation && intent) {
-      const { confirmed } = await inquirer.prompt([
-        {
-          type: 'confirm',
-          name: 'confirmed',
-          message: 'Would you like to proceed?',
-          default: true
-        }
-      ]);
-
+      const confirmed = await handleConfirmationFlow(intent, userName);
       if (confirmed) {
-        console.log("INTENT", intent)
-        console.log(chalk.green(`\nProceeding with: ${intent}`));
         // Execute the actual Git operation based on intent
         await executeGitOperation(intent, userName);
-      } else {
-        console.log(chalk.yellow("\nOperation cancelled."));
       }
+    } else {
+      console.log(response);
     }
   } catch (error) {
     console.error(`Error processing NLP query: ${error.message}`);
@@ -1003,7 +1064,6 @@ export async function handleNlpCommand(query) {
 
 async function executeGitOperation(intentObj, userName) {
   const { intent, entities = {} } = intentObj;
-  console.log(chalk.blue(`\nExecuting ${intent} operation...`));
 
   // Normalize intent for common variants
   let normalizedIntent = intent;
@@ -1297,15 +1357,7 @@ async function executeGitOperation(intentObj, userName) {
 
         try {
           // Ensure remote is authenticated before pushing
-          console.log(chalk.blue(`\nSetting up authentication for ${remote}...`));
           await gitService.ensureAuthenticatedRemote('.');
-          
-          // Verify the remote URL was updated
-          const remotes = await gitService.getRemotes('.');
-          const origin = remotes.find(r => r.name === 'origin');
-          if (origin) {
-            console.log(chalk.blue(`Final origin URL: ${origin.refs.fetch}`));
-          }
           
           console.log(chalk.blue(`\nPushing to ${remote}/${targetBranch}...`));
           await gitService.pushChanges(remote, targetBranch, '.', { setUpstream: true, force: entities.force });
@@ -1445,9 +1497,16 @@ async function executeGitOperation(intentObj, userName) {
           if (repos.length === 0) {
             console.log(chalk.yellow('No repositories found.'));
           } else {
-            repos.forEach(repo => {
-              console.log(chalk.green(repo.full_name), '-', repo.html_url);
-            });
+            UI.section('Your GitHub Repositories', `Found ${repos.length} repository(ies)`);
+
+            const repoData = repos.map(repo => ({
+              Name: repo.full_name,
+              Type: repo.private ? 'Private' : 'Public',
+              Updated: new Date(repo.updated_at).toLocaleDateString(),
+              URL: repo.html_url
+            }));
+
+            UI.table(repoData);
           }
         } catch (error) {
           console.error(chalk.red('Error listing repositories:'), error.message);

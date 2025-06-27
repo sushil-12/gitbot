@@ -90,11 +90,9 @@ async function getMistralClient() {
           } else if (typeof data === 'string') {
             return data;
           } else {
-            console.error('Unexpected Mistral response format:', data);
             throw new Error('Invalid response format from Mistral proxy');
           }
         } catch (error) {
-          console.error('Mistral client error:', error);
           throw error;
         }
       }
@@ -104,46 +102,100 @@ async function getMistralClient() {
 }
 
 // Helper function to detect conversation type
-function detectConversationType(query) {
-  if (!query || query.trim().length < 2) {
-    return { type: CONVERSATION_TYPES.ERROR, response: "I didn't quite catch that. Could you please rephrase?" };
-  }
-
+function detectConversationType(query, username = 'there') {
   const lowerQuery = query.toLowerCase().trim();
-
-  // Greetings detection
+  
+  // Greetings
   const greetings = ['hello', 'hi', 'hey', 'greetings', 'good morning', 'good afternoon', 'good evening'];
   if (greetings.some(g => lowerQuery.includes(g))) {
-    return { type: CONVERSATION_TYPES.GREETING };
+    return { type: CONVERSATION_TYPES.GREETING, response: null, immediate: true };
   }
-
-  // Thanks detection
-  if (lowerQuery.includes('thank') || lowerQuery.includes('thanks') || lowerQuery.includes('appreciate')) {
-    return { type: CONVERSATION_TYPES.THANKS };
+  
+  // Thanks
+  const thanks = ['thank', 'thanks', 'appreciate', 'thx'];
+  if (thanks.some(t => lowerQuery.includes(t))) {
+    return { type: CONVERSATION_TYPES.THANKS, response: null, immediate: true };
   }
-
-  // Help detection
-  if (lowerQuery.includes('help') || lowerQuery.includes('what can you do')) {
-    return { type: CONVERSATION_TYPES.HELP };
+  
+  // Help requests
+  const helpKeywords = ['help', 'what can you do', 'how to', 'examples', 'commands'];
+  if (helpKeywords.some(h => lowerQuery.includes(h))) {
+    return { type: CONVERSATION_TYPES.HELP, response: null, immediate: true };
   }
-
-  // How are you detection
-  if (lowerQuery.includes('how are you') || lowerQuery.includes("what's up")) {
-    return { 
-      type: CONVERSATION_TYPES.GREETING,
-      response: "I'm just a program, but I'm functioning well! How can I help you with version control?"
-    };
+  
+  // Show/display operations - check these before help keywords
+  if (lowerQuery.includes('show') || lowerQuery.includes('display')) {
+    if (lowerQuery.includes('status') || lowerQuery.includes('state')) {
+      return { type: CONVERSATION_TYPES.GIT_OPERATION, response: null, immediate: false };
+    }
+    if (lowerQuery.includes('diff') || lowerQuery.includes('difference')) {
+      return { type: CONVERSATION_TYPES.GIT_OPERATION, response: null, immediate: false };
+    }
+    if (lowerQuery.includes('remote') || lowerQuery.includes('remotes')) {
+      return { type: CONVERSATION_TYPES.GIT_OPERATION, response: null, immediate: false };
+    }
+    if (lowerQuery.includes('branch') || lowerQuery.includes('branches')) {
+      return { type: CONVERSATION_TYPES.GIT_OPERATION, response: null, immediate: false };
+    }
+    if (lowerQuery.includes('log') || lowerQuery.includes('history') || lowerQuery.includes('commits')) {
+      return { type: CONVERSATION_TYPES.GIT_OPERATION, response: null, immediate: false };
+    }
+    if (lowerQuery.includes('change') || lowerQuery.includes('changes')) {
+      return { type: CONVERSATION_TYPES.GIT_OPERATION, response: null, immediate: false };
+    }
   }
-
-  // Git/GitHub operation detection
-  const gitKeywords = ['git', 'push', 'pull', 'commit', 'branch', 'merge', 'rebase', 'clone', 'fork', 'repo'];
-  const githubKeywords = ['github', 'pull request', 'pr', 'issue', 'repository'];
-  if (gitKeywords.some(k => lowerQuery.includes(k)) || githubKeywords.some(k => lowerQuery.includes(k))) {
-    return { type: lowerQuery.includes('github') ? CONVERSATION_TYPES.GITHUB_OPERATION : CONVERSATION_TYPES.GIT_OPERATION };
+  
+  // List operations - be more specific
+  if (lowerQuery.includes('list')) {
+    // List repositories
+    if (lowerQuery.includes('repo') || lowerQuery.includes('repository') || 
+        (lowerQuery.includes('all') && lowerQuery.includes('my') && lowerQuery.includes('repo'))) {
+      return { type: CONVERSATION_TYPES.GITHUB_OPERATION, response: null, immediate: false };
+    }
+    
+    // List branches
+    if (lowerQuery.includes('branch') || lowerQuery.includes('branches')) {
+      return { type: CONVERSATION_TYPES.GIT_OPERATION, response: null, immediate: false };
+    }
+    
+    // List remotes
+    if (lowerQuery.includes('remote') || lowerQuery.includes('remotes')) {
+      return { type: CONVERSATION_TYPES.GIT_OPERATION, response: null, immediate: false };
+    }
+    
+    // List changes (Git status)
+    if (lowerQuery.includes('change') || lowerQuery.includes('changes') || 
+        lowerQuery.includes('modified') || lowerQuery.includes('staged')) {
+      return { type: CONVERSATION_TYPES.GIT_OPERATION, response: null, immediate: false };
+    }
+    
+    // List commits/log
+    if (lowerQuery.includes('commit') || lowerQuery.includes('log') || 
+        lowerQuery.includes('history') || lowerQuery.includes('commits')) {
+      return { type: CONVERSATION_TYPES.GIT_OPERATION, response: null, immediate: false };
+    }
   }
-
-  // If none of the above, assume unrelated
-  return { type: CONVERSATION_TYPES.UNRELATED };
+  
+  // Git operations
+  const gitKeywords = ['git', 'push', 'pull', 'commit', 'branch', 'merge', 'rebase', 'checkout', 'switch', 'add', 'stash', 'reset', 'revert'];
+  if (gitKeywords.some(k => lowerQuery.includes(k))) {
+    return { type: CONVERSATION_TYPES.GIT_OPERATION, response: null, immediate: false };
+  }
+  
+  // GitHub operations
+  const githubKeywords = ['github', 'pull request', 'pr', 'issue', 'repository', 'repo', 'fork', 'clone'];
+  if (githubKeywords.some(k => lowerQuery.includes(k))) {
+    return { type: CONVERSATION_TYPES.GITHUB_OPERATION, response: null, immediate: false };
+  }
+  
+  // Check if it's unrelated to Git/GitHub
+  const unrelatedKeywords = ['weather', 'time', 'date', 'calculator', 'math', 'translate', 'search'];
+  if (unrelatedKeywords.some(k => lowerQuery.includes(k))) {
+    return { type: CONVERSATION_TYPES.UNRELATED, response: null, immediate: true };
+  }
+  
+  // Default to Git operation for ambiguous cases
+  return { type: CONVERSATION_TYPES.GIT_OPERATION, response: null, immediate: false };
 }
 
 export const aiService = {
@@ -284,69 +336,36 @@ export const aiService = {
 
   async parseIntent(query) {
     try {
-      // First check if this is a conversation rather than a Git command
-      const { type } = detectConversationType(query);
-      if (type !== CONVERSATION_TYPES.GIT_OPERATION && type !== CONVERSATION_TYPES.GITHUB_OPERATION) {
-        return { intent: type, entities: {} };
+      const cacheKey = `intent_${query.toLowerCase().trim()}`;
+      const cached = aiResponseCache.get(cacheKey);
+      if (cached) {
+        return cached;
       }
 
-      // Check cache for Git operations
-      const cacheKey = `intent:${query}`;
-      if (aiResponseCache.has(cacheKey)) {
-        return aiResponseCache.get(cacheKey);
-      }
+      // Enhanced prompt for better intent understanding
+      const prompt = `Analyze this Git/GitHub command and extract the intent and entities. Be very specific about the context.
 
-      // Simple fallback for common commands before trying AI
-      const lowerQuery = query.toLowerCase().trim();
+      Query: "${query}"
       
-      // Push commands
-      if (lowerQuery.includes('push')) {
-        const entities = {};
-        if (lowerQuery.includes('main')) entities.branch = 'main';
-        if (lowerQuery.includes('force')) entities.force = true;
-        if (lowerQuery.includes('origin')) entities.remote = 'origin';
-        
-        return { 
-          intent: 'push_changes', 
-          entities: { ...entities, branch: entities.branch || 'current', remote: entities.remote || 'origin' },
-          confidence: 0.9
-        };
-      }
+      Important context clues:
+      - "list my changes" = git status (show modified/staged files)
+      - "list my branches" = list local branches
+      - "list my repos" = list GitHub repositories
+      - "show status" = git status
+      - "show diff" = git diff
+      - "show log" = git log
+      - "push changes" = git push
+      - "pull changes" = git pull
+      - "commit changes" = git commit
       
-      // Commit commands
-      if (lowerQuery.includes('commit')) {
-        const entities = {};
-        const messageMatch = query.match(/['"]([^'"]+)['"]/);
-        if (messageMatch) entities.commit_message = messageMatch[1];
-        
-        return { 
-          intent: 'git_commit', 
-          entities,
-          confidence: 0.9
-        };
-      }
-      
-      // Status commands
-      if (lowerQuery.includes('status')) {
-        return { 
-          intent: 'git_status', 
-          entities: {},
-          confidence: 0.9
-        };
-      }
-
-      const prompt = `Analyze this Git/GitHub command and extract the intent and entities. Return a JSON object with:
-      - intent: The main action (push_changes, create_branch, git_commit, create_pr, etc.)
+      Return a JSON object with:
+      - intent: The main action (list_repos, list_branches, git_status, git_diff, git_log, push_changes, etc.)
       - entities: Object with relevant parameters (branch, commit_message, files, etc.)
       - confidence: Your confidence score (0-1)
       
-      Query: "${query}"
-      
       Return only valid JSON:`;
 
-      console.log('Sending prompt to AI:', prompt);
-      const response = await this.generateResponse(prompt, { max_tokens: 500, temperature: 0.2 });
-      console.log('AI response:', response);
+      const response = await this.generateResponse(prompt, { max_tokens: 500, temperature: 0.1 });
       
       let parsed;
       try {
@@ -359,15 +378,12 @@ export const aiService = {
         }
         parsed = JSON.parse(jsonContent);
       } catch (parseError) {
-        console.error('Failed to parse AI response as JSON:', { response, error: parseError.message });
-        
         // Try to extract JSON from the response
         const jsonMatch = response.match(/\{[\s\S]*\}/);
         if (jsonMatch) {
           try {
             parsed = JSON.parse(jsonMatch[0]);
           } catch (secondError) {
-            console.error('Failed to parse extracted JSON:', secondError);
             parsed = { intent: 'unknown', entities: { error: 'Failed to parse response' } };
           }
         } else {
@@ -403,23 +419,41 @@ export const aiService = {
         return this.handleConversation(parsed.intent, username);
       }
 
-      const prompt = `Generate a clear, friendly confirmation message for this Git operation for user "${username}":
+      // Create specific confirmation messages based on intent
+      const intentMessages = {
+        'list_repos': `Hi ${username}, I'll fetch and display your GitHub repositories. Ready to proceed?`,
+        'list_branches': `Hi ${username}, I'll show you all the branches in this repository. Ready to proceed?`,
+        'git_status': `Hi ${username}, I'll show you the current status of your Git repository (staged, modified, and untracked files). Ready to proceed?`,
+        'git_diff': `Hi ${username}, I'll show you the differences in your working directory. Ready to proceed?`,
+        'git_log': `Hi ${username}, I'll show you the commit history. Ready to proceed?`,
+        'get_remotes': `Hi ${username}, I'll show you the configured remote repositories. Ready to proceed?`,
+        'create_repo': `Hi ${username}, I'll create a new repository for you. Ready to proceed?`,
+        'push_changes': `Hi ${username}, I'll push your changes to the remote repository. Ready to proceed?`,
+        'git_commit': `Hi ${username}, I'll commit your staged changes. Ready to proceed?`,
+        'git_add': `Hi ${username}, I'll stage the specified files. Ready to proceed?`,
+        'create_branch': `Hi ${username}, I'll create a new branch for you. Ready to proceed?`,
+        'checkout_branch': `Hi ${username}, I'll switch to the specified branch. Ready to proceed?`,
+        'pull_changes': `Hi ${username}, I'll pull the latest changes from the remote. Ready to proceed?`,
+        'merge_branch': `Hi ${username}, I'll merge the specified branch. Ready to proceed?`,
+        'clone_repo': `Hi ${username}, I'll clone the repository for you. Ready to proceed?`,
+        'revert_commit': `Hi ${username}, I'll revert the specified commit. Ready to proceed?`,
+        'create_pr': `Hi ${username}, I'll create a pull request for you. Ready to proceed?`,
+        'set_default_branch': `Hi ${username}, I'll set the default branch. Ready to proceed?`,
+        'configure_git_user': `Hi ${username}, I'll configure your Git user settings. Ready to proceed?`,
+        'get_current_branch': `Hi ${username}, I'll show you the current branch. Ready to proceed?`,
+        'add_remote': `Hi ${username}, I'll add a new remote repository. Ready to proceed?`,
+        'get_diff_between_branches': `Hi ${username}, I'll show you the differences between branches. Ready to proceed?`,
+        'create_and_checkout_branch': `Hi ${username}, I'll create and switch to a new branch. Ready to proceed?`,
+        'git_init': `Hi ${username}, I'll initialize a new Git repository. Ready to proceed?`,
+        'git_revert_last_commit': `Hi ${username}, I'll revert the last commit. Ready to proceed?`,
+        'push_changes': `Hi ${username}, I'll push your changes. Ready to proceed?`
+      };
 
-      Intent: ${parsed.intent}
-      Entities: ${JSON.stringify(parsed.entities, null, 2)}
-      
-      Write a brief, natural confirmation message that:
-      1. Explains what will happen
-      2. Uses the user's name if available
-      3. Asks for confirmation if needed
-      4. Is warm and professional
-      
-      Message:`;
-
-      return await this.generateResponse(prompt, { max_tokens: 200 });
+      // Return specific message if available, otherwise generic
+      return intentMessages[parsed.intent] || `Hi ${username}, I'll perform the ${parsed.intent} operation. Ready to proceed?`;
     } catch (error) {
       logger.error('Confirmation generation failed:', { message: error.message, service: serviceName });
-      return `I'll perform the ${parsed.intent} operation. Let me know if you'd like to proceed.`;
+      return `Hi ${username}, I'll perform the ${parsed.intent} operation. Ready to proceed?`;
     }
   },
 
@@ -511,6 +545,12 @@ export const aiService = {
         const helpResponse = await this.generateCommandHelp();
         return { response: helpResponse, requiresConfirmation: false };
       }
+      if (immediate && type === CONVERSATION_TYPES.UNRELATED) {
+        return { 
+          response: response || "I'm specialized in Git operations. I can help you with version control, repositories, and GitHub-related tasks.",
+          requiresConfirmation: false 
+        };
+      }
 
       // For Git operations, parse the intent and prepare confirmation
       if (type === CONVERSATION_TYPES.GIT_OPERATION || type === CONVERSATION_TYPES.GITHUB_OPERATION) {
@@ -523,10 +563,19 @@ export const aiService = {
         };
       }
 
-      // Fallback for any other cases
+      // For greetings and thanks, handle immediately
+      if (type === CONVERSATION_TYPES.GREETING || type === CONVERSATION_TYPES.THANKS) {
+        const conversationResponse = await this.handleConversation(type, username);
+        return { response: conversationResponse, requiresConfirmation: false };
+      }
+
+      // Fallback: treat as Git operation
+      const parsedIntent = await this.parseIntent(query);
+      const confirmation = await this.generateConfirmation(parsedIntent, username);
       return { 
-        response: response || "I'm not sure how to help with that. I specialize in Git and GitHub operations.",
-        requiresConfirmation: false
+        response: confirmation,
+        intent: parsedIntent,
+        requiresConfirmation: true 
       };
     } catch (error) {
       logger.error('Error handling user query:', { message: error.message, service: serviceName });
