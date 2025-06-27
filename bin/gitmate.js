@@ -2,7 +2,7 @@
 
 import { fileURLToPath } from 'url';
 import { dirname, join } from 'path';
-import { handleNlpCommand, handleRepoCommand, handleGitCommand, handleGenerateGitignore, handleGenerateCommitMessage, handleAuthLogout, handleSwitchAIProvider } from '../commands/commandHandler.js';
+import { handleNlpCommand, handleRepoCommand, handleGitCommand, handleGenerateGitignore, handleGenerateCommitMessage, handleAuthLogout, handleSwitchAIProvider, handleUserInfo, handleGitConfig } from '../commands/commandHandler.js';
 import logger from '../src/utils/logger.js';
 import UI from '../src/utils/ui.js';
 import { storeToken } from '../src/utils/tokenManager.js';
@@ -84,6 +84,11 @@ async function main() {
         await handleAuthLogout();
         break;
         
+      case 'whoami':
+      case 'who':
+        await handleUserInfo();
+        break;
+        
       case 'list':
         // Handle list command - route to repo list functionality
         await handleRepoCommand(['list', ...args.slice(1)]);
@@ -131,6 +136,7 @@ COMMANDS:
   generate-gitignore      Generate .gitignore file
   switch-ai-provider      Switch between AI providers
   logout                  Clear stored authentication tokens
+  whoami                  Show current user information
 
 NATURAL LANGUAGE COMMANDS:
   gitmate "push my changes to main"
@@ -138,6 +144,7 @@ NATURAL LANGUAGE COMMANDS:
   gitmate "commit with message 'fix bug'"
   gitmate "create merge request from feature to main"
   gitmate "list all of my repos"
+  gitmate "who am i"
 
 OPTIONS:
   -h, --help     Show this help message
@@ -146,6 +153,8 @@ OPTIONS:
 EXAMPLES:
   gitmate init
   gitmate config --show
+  gitmate config git set
+  gitmate whoami
   gitmate list
   gitmate "list all of my repos"
   gitmate "push code please"
@@ -256,9 +265,16 @@ async function handleConfig(args) {
       return;
     }
     
+    // Handle git config subcommand
+    if (args[0] === 'git') {
+      await handleGitConfig(args.slice(1));
+      return;
+    }
+    
     // Handle other config options
     UI.warning('Unknown Config Option', `Unknown config option: ${args.join(' ')}`);
-    console.log('Available options: --show, --reset');
+    console.log('Available options: --show, --reset, git <subcommand>');
+    console.log('Git subcommands: show, set, reset');
     
   } catch (error) {
     logger.error('Config error:', { message: error.message, stack: error.stack, service: serviceName });
@@ -292,7 +308,6 @@ async function handleAuth(args) {
           validate: input => input.trim() !== '' || 'Token is required',
         },
       ]);
-      console.log("i am clalle");
       await storeToken('github_access_token', token.trim());
       console.log('Authentication Complete: Your GitHub token has been saved. You are now authenticated!');
       break;
@@ -428,7 +443,9 @@ async function handleAiIntent(userInput) {
         await handleGitCommand(['diff'], '.');
         break;
       case 'push_changes':
-        await handleGitCommand(['push'], '.');
+        // Use executeGitOperation for interactive commit logic
+        const { executeGitOperation } = await import('../commands/commandHandler.js');
+        await executeGitOperation({ intent, entities }, 'User');
         break;
       case 'pull_changes':
         await handleGitCommand(['pull'], '.');
@@ -447,6 +464,18 @@ async function handleAiIntent(userInput) {
         break;
       case 'clone_repo':
         await handleGitCommand(['clone', entities?.repo_url], '.');
+        break;
+      case 'user_info':
+      case 'who_am_i':
+      case 'login_info':
+        await handleUserInfo();
+        break;
+      case 'git_config':
+      case 'configure_git':
+        await handleGitConfig(['set']);
+        break;
+      case 'show_git_config':
+        await handleGitConfig(['show']);
         break;
       // Add more intent handlers as needed
       default:

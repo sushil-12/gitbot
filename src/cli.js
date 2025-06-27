@@ -10,7 +10,7 @@ const program = new Command();
 
 async function main() {
   logger.info('GitBot CLI starting...', { service: 'CLI' });
-
+  console.log(process.argv);
   program
     .name('gitbot')
     .description('An intelligent GitBot powered by AI and GitHub integrations.')

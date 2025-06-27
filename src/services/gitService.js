@@ -715,3 +715,69 @@ export async function configureGitUser(directoryPath = '.', userConfig = {}) {
     throw error;
   }
 }
+
+/**
+ * Get Git configuration
+ */
+export async function getGitConfig(directoryPath = '.') {
+  const git = simpleGit(directoryPath);
+
+  try {
+    const config = await git.listConfig();
+    
+    // Extract user configuration
+    const userConfig = {
+      user: {
+        name: config.all['user.name'] || null,
+        email: config.all['user.email'] || null
+      },
+      core: {
+        repositoryformatversion: config.all['core.repositoryformatversion'] || null,
+        filemode: config.all['core.filemode'] || null,
+        bare: config.all['core.bare'] || null,
+        logallrefupdates: config.all['core.logallrefupdates'] || null
+      },
+      remote: {},
+      branch: {}
+    };
+
+    // Extract remote configurations
+    Object.keys(config.all).forEach(key => {
+      if (key.startsWith('remote.')) {
+        const parts = key.split('.');
+        if (parts.length >= 3) {
+          const remoteName = parts[1];
+          const property = parts[2];
+          if (!userConfig.remote[remoteName]) {
+            userConfig.remote[remoteName] = {};
+          }
+          userConfig.remote[remoteName][property] = config.all[key];
+        }
+      }
+    });
+
+    // Extract branch configurations
+    Object.keys(config.all).forEach(key => {
+      if (key.startsWith('branch.')) {
+        const parts = key.split('.');
+        if (parts.length >= 3) {
+          const branchName = parts[1];
+          const property = parts[2];
+          if (!userConfig.branch[branchName]) {
+            userConfig.branch[branchName] = {};
+          }
+          userConfig.branch[branchName][property] = config.all[key];
+        }
+      }
+    });
+
+    return userConfig;
+  } catch (error) {
+    logger.error('Error getting git config:', {
+      message: error.message,
+      stack: error.stack,
+      service: serviceName
+    });
+    throw new Error(`Failed to get Git configuration: ${error.message}`);
+  }
+}

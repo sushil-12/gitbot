@@ -516,26 +516,13 @@ export async function handleGenerateCommitMessage(directoryPath = '.') {
 }
 
 export async function handleAuthLogout() {
-  logger.info("Handling auth logout command...", { service: serviceName });
   try {
-    // Assuming clearAllTokens is more appropriate for a full logout.
-    // If you only want to clear the GitHub token, use:
-    // await storeToken('github_access_token', null);
-    const { clearAllTokens } = await import("../src/utils/tokenManager.js"); // Dynamic import if not already at top
     await clearAllTokens();
-    console.log("Successfully cleared stored authentication token(s).");
-    logger.info("Authentication token(s) cleared.", {
-      service: serviceName,
-    });
+    UI.success('Logged Out Successfully', 'All authentication tokens have been cleared.');
+    logger.info('User logged out successfully', { service: serviceName });
   } catch (error) {
-    logger.error("Error during auth logout:", {
-      message: error.message,
-      stack: error.stack,
-      service: serviceName,
-    });
-    console.error(
-      "An error occurred while trying to clear authentication tokens."
-    );
+    UI.error('Logout Failed', error.message);
+    logger.error('Logout failed:', { message: error.message, stack: error.stack, service: serviceName });
   }
 }
 
@@ -908,6 +895,7 @@ export async function handleAuth(args) {
 
 export async function handleNlpCommand(query) {
   logger.info(`Handling NLP query: "${query}"`, { service: serviceName });
+  console.log(query);
   if (!query || query.trim() === '') {
     console.error("NLP query cannot be empty.");
     return;
@@ -1062,9 +1050,9 @@ export async function handleNlpCommand(query) {
   }
 }
 
-async function executeGitOperation(intentObj, userName) {
+export async function executeGitOperation(intentObj, userName) {
   const { intent, entities = {} } = intentObj;
-
+  console.log(intentObj);
   // Normalize intent for common variants
   let normalizedIntent = intent;
   if ([
@@ -1680,5 +1668,169 @@ async function executeGitOperation(intentObj, userName) {
     if (error.message.includes('merge conflict')) {
       console.log(chalk.yellow('\nResolve conflicts and try committing again.'));
     }
+  }
+}
+
+export async function handleUserInfo() {
+  try {
+    // Get GitHub user info
+    const token = await getToken('github_access_token');
+    let githubUser = null;
+    
+    if (token) {
+      try {
+        githubUser = await githubService.getUserProfile();
+      } catch (error) {
+        logger.warn('Could not fetch GitHub user info:', { error: error.message, service: serviceName });
+      }
+    }
+
+    // Get Git config info
+    let gitConfig = null;
+    try {
+      gitConfig = await gitService.getGitConfig('.');
+    } catch (error) {
+      logger.warn('Could not fetch Git config:', { error: error.message, service: serviceName });
+    }
+
+    // Display user information
+    UI.section('User Information', 'Current authentication and configuration status');
+
+    const userData = [];
+    
+    if (githubUser) {
+      userData.push({
+        Service: 'GitHub',
+        Username: githubUser.login,
+        Name: githubUser.name || 'Not set',
+        Email: githubUser.email || 'Not set',
+        Status: '✅ Authenticated'
+      });
+    } else {
+      userData.push({
+        Service: 'GitHub',
+        Username: 'Not authenticated',
+        Name: 'Not available',
+        Email: 'Not available',
+        Status: '❌ Not authenticated'
+      });
+    }
+
+    if (gitConfig) {
+      userData.push({
+        Service: 'Git Config',
+        Username: gitConfig.user?.name || 'Not set',
+        Name: gitConfig.user?.name || 'Not set',
+        Email: gitConfig.user?.email || 'Not set',
+        Status: gitConfig.user?.name ? '✅ Configured' : '⚠️ Partially configured'
+      });
+    } else {
+      userData.push({
+        Service: 'Git Config',
+        Username: 'Not configured',
+        Name: 'Not configured',
+        Email: 'Not configured',
+        Status: '❌ Not configured'
+      });
+    }
+
+    UI.table(userData);
+
+    // Show helpful information
+    if (!githubUser) {
+      UI.info('GitHub Authentication', 'Run "gitmate auth github" to authenticate with GitHub');
+    }
+    
+    if (!gitConfig?.user?.name || !gitConfig?.user?.email) {
+      UI.info('Git Configuration', 'Run "gitmate config git" to configure your Git user settings');
+    }
+
+  } catch (error) {
+    UI.error('Failed to Get User Info', error.message);
+    logger.error('Failed to get user info:', { message: error.message, stack: error.stack, service: serviceName });
+  }
+}
+
+export async function handleGitConfig(args) {
+  try {
+    const [subCommand, ...options] = args;
+    
+    switch (subCommand) {
+      case 'show':
+      case 'view':
+        // Show current Git config
+        try {
+          const config = await gitService.getGitConfig('.');
+          console.log('\nCurrent Git Configuration:');
+          console.log(JSON.stringify(config, null, 2));
+        } catch (error) {
+          console.error(`Error getting Git config: ${error.message}`);
+        }
+        break;
+
+      case 'set':
+        // Set Git config values
+        const { name, email } = await inquirer.prompt([
+          {
+            type: 'input',
+            name: 'name',
+            message: 'Enter your name:',
+            default: '',
+            validate: input => input.trim() !== '' || 'Name is required'
+          },
+          {
+            type: 'input',
+            name: 'email',
+            message: 'Enter your email:',
+            default: '',
+            validate: input => {
+              const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+              return emailRegex.test(input.trim()) || 'Please enter a valid email address';
+            }
+          }
+        ]);
+
+        try {
+          await gitService.configureGitUser('.', { name: name.trim(), email: email.trim() });
+          UI.success('Git Configuration Updated', `Name: ${name}\nEmail: ${email}`);
+        } catch (error) {
+          UI.error('Failed to Update Git Config', error.message);
+        }
+        break;
+
+      case 'reset':
+        // Reset Git config to defaults
+        const { confirm } = await inquirer.prompt([
+          {
+            type: 'confirm',
+            name: 'confirm',
+            message: 'Are you sure you want to reset your Git configuration?',
+            default: false
+          }
+        ]);
+
+        if (confirm) {
+          try {
+            await gitService.configureGitUser('.', { name: 'GitBot', email: 'gitbot@example.com' });
+            UI.success('Git Configuration Reset', 'Reset to default values');
+          } catch (error) {
+            UI.error('Failed to Reset Git Config', error.message);
+          }
+        } else {
+          console.log('Operation cancelled.');
+        }
+        break;
+
+      default:
+        UI.warning('Unknown Config Command', `Unknown 'config git' subcommand: ${subCommand}`);
+        UI.help([
+          { name: 'show', description: 'Show current Git configuration', examples: ['config git show'] },
+          { name: 'set', description: 'Set Git user name and email', examples: ['config git set'] },
+          { name: 'reset', description: 'Reset Git configuration to defaults', examples: ['config git reset'] }
+        ]);
+    }
+  } catch (error) {
+    UI.error('Git Config Error', error.message);
+    logger.error('Git config error:', { message: error.message, stack: error.stack, service: serviceName });
   }
 }
