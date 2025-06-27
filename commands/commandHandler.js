@@ -1366,11 +1366,143 @@ export async function executeGitOperation(intentObj, userName) {
         } catch (pushError) {
           console.error(chalk.red(`\nPush failed: ${pushError.message}`));
 
-          // Provide helpful suggestions
-          if (pushError.message.includes('no upstream branch')) {
-            console.log(chalk.yellow('\nTry: git push --set-upstream origin', targetBranch));
-          } else if (pushError.message.includes('updates were rejected')) {
-            console.log(chalk.yellow('\nTry: git pull first to merge remote changes'));
+          // Handle case where no remote exists
+          if (pushError.message.includes("'origin' does not appear to be a git repository")) {
+            console.log(chalk.yellow('\nNo remote repository configured. Let\'s set one up!'));
+            
+            const { action } = await inquirer.prompt([
+              {
+                type: 'list',
+                name: 'action',
+                message: 'What would you like to do?',
+                choices: [
+                  { name: 'Create a new GitHub repository', value: 'create' },
+                  { name: 'Use an existing GitHub repository', value: 'existing' },
+                  { name: 'Cancel', value: 'cancel' }
+                ]
+              }
+            ]);
+
+            if (action === 'cancel') {
+              return;
+            }
+
+            if (action === 'create') {
+              // Create new repository
+              const { repoName } = await inquirer.prompt([
+                {
+                  type: 'input',
+                  name: 'repoName',
+                  message: 'Enter repository name:',
+                  validate: input => input.trim() !== '' || 'Repository name cannot be empty'
+                }
+              ]);
+
+              const { isPrivate } = await inquirer.prompt([
+                {
+                  type: 'confirm',
+                  name: 'isPrivate',
+                  message: 'Make this repository private?',
+                  default: false
+                }
+              ]);
+
+              const { description } = await inquirer.prompt([
+                {
+                  type: 'input',
+                  name: 'description',
+                  message: 'Repository description (optional):',
+                  default: ''
+                }
+              ]);
+
+              try {
+                console.log(chalk.blue('\nCreating repository...'));
+                const repo = await githubService.createRepository(repoName, {
+                  private: isPrivate,
+                  description: description,
+                  auto_init: false // Don't initialize with README since we already have files
+                });
+
+                console.log(chalk.green(`\nRepository created: ${repo.full_name}`));
+                console.log(chalk.blue(`URL: ${repo.html_url}`));
+
+                // Add remote with token
+                const token = await getToken('github_access_token');
+                if (token) {
+                  const remoteUrl = `https://x-access-token:${token}@github.com/${repo.full_name}.git`;
+                  await gitService.addRemote('origin', remoteUrl, '.');
+                  console.log(chalk.green('\nRemote origin added with authentication'));
+                } else {
+                  const remoteUrl = `https://github.com/${repo.full_name}.git`;
+                  await gitService.addRemote('origin', remoteUrl, '.');
+                  console.log(chalk.green('\nRemote origin added'));
+                }
+
+                // Try pushing again
+                console.log(chalk.blue('\nPushing to new repository...'));
+                await gitService.pushChanges('origin', targetBranch, '.', { setUpstream: true });
+                console.log(chalk.green('\nPush successful!'));
+
+              } catch (error) {
+                console.error(chalk.red(`\nFailed to create repository: ${error.message}`));
+                return;
+              }
+
+            } else if (action === 'existing') {
+              // List existing repositories
+              try {
+                console.log(chalk.blue('\nFetching your repositories...'));
+                const repos = await githubService.listUserRepositories();
+                
+                if (repos.length === 0) {
+                  console.log(chalk.yellow('\nNo repositories found. Please create one first.'));
+                  return;
+                }
+
+                const repoChoices = repos.map(repo => ({
+                  name: `${repo.full_name} (${repo.private ? 'Private' : 'Public'})`,
+                  value: repo.full_name
+                }));
+
+                const { selectedRepo } = await inquirer.prompt([
+                  {
+                    type: 'list',
+                    name: 'selectedRepo',
+                    message: 'Select a repository:',
+                    choices: repoChoices
+                  }
+                ]);
+
+                // Add remote with token
+                const token = await getToken('github_access_token');
+                if (token) {
+                  const remoteUrl = `https://x-access-token:${token}@github.com/${selectedRepo}.git`;
+                  await gitService.addRemote('origin', remoteUrl, '.');
+                  console.log(chalk.green('\nRemote origin added with authentication'));
+                } else {
+                  const remoteUrl = `https://github.com/${selectedRepo}.git`;
+                  await gitService.addRemote('origin', remoteUrl, '.');
+                  console.log(chalk.green('\nRemote origin added'));
+                }
+
+                // Try pushing again
+                console.log(chalk.blue('\nPushing to selected repository...'));
+                await gitService.pushChanges('origin', targetBranch, '.', { setUpstream: true });
+                console.log(chalk.green('\nPush successful!'));
+
+              } catch (error) {
+                console.error(chalk.red(`\nFailed to list repositories: ${error.message}`));
+                return;
+              }
+            }
+          } else {
+            // Provide helpful suggestions for other push errors
+            if (pushError.message.includes('no upstream branch')) {
+              console.log(chalk.yellow('\nTry: git push --set-upstream origin', targetBranch));
+            } else if (pushError.message.includes('updates were rejected')) {
+              console.log(chalk.yellow('\nTry: git pull first to merge remote changes'));
+            }
           }
         }
         break;
@@ -1583,10 +1715,127 @@ export async function executeGitOperation(intentObj, userName) {
       }
       case 'add_remote': {
         try {
-          const { name } = await inquirer.prompt([{ type: 'input', name: 'name', message: 'Remote name:' }]);
-          const { url } = await inquirer.prompt([{ type: 'input', name: 'url', message: 'Remote URL:' }]);
-          const result = await gitService.addRemote(name, url, '.');
-          console.log(chalk.green(result));
+          const { action } = await inquirer.prompt([
+            {
+              type: 'list',
+              name: 'action',
+              message: 'How would you like to add a remote?',
+              choices: [
+                { name: 'Create a new GitHub repository', value: 'create' },
+                { name: 'Use an existing GitHub repository', value: 'existing' },
+                { name: 'Enter remote URL manually', value: 'manual' }
+              ]
+            }
+          ]);
+
+          if (action === 'create') {
+            // Create new repository
+            const { repoName } = await inquirer.prompt([
+              {
+                type: 'input',
+                name: 'repoName',
+                message: 'Enter repository name:',
+                validate: input => input.trim() !== '' || 'Repository name cannot be empty'
+              }
+            ]);
+
+            const { isPrivate } = await inquirer.prompt([
+              {
+                type: 'confirm',
+                name: 'isPrivate',
+                message: 'Make this repository private?',
+                default: false
+              }
+            ]);
+
+            const { description } = await inquirer.prompt([
+              {
+                type: 'input',
+                name: 'description',
+                message: 'Repository description (optional):',
+                default: ''
+              }
+            ]);
+
+            console.log(chalk.blue('\nCreating repository...'));
+            const repo = await githubService.createRepository(repoName, {
+              private: isPrivate,
+              description: description,
+              auto_init: false
+            });
+
+            console.log(chalk.green(`\nRepository created: ${repo.full_name}`));
+            console.log(chalk.blue(`URL: ${repo.html_url}`));
+
+            // Add remote with token
+            const token = await getToken('github_access_token');
+            if (token) {
+              const remoteUrl = `https://x-access-token:${token}@github.com/${repo.full_name}.git`;
+              await gitService.addRemote('origin', remoteUrl, '.');
+              console.log(chalk.green('\nRemote origin added with authentication'));
+            } else {
+              const remoteUrl = `https://github.com/${repo.full_name}.git`;
+              await gitService.addRemote('origin', remoteUrl, '.');
+              console.log(chalk.green('\nRemote origin added'));
+            }
+
+          } else if (action === 'existing') {
+            // List existing repositories
+            console.log(chalk.blue('\nFetching your repositories...'));
+            const repos = await githubService.listUserRepositories();
+            
+            if (repos.length === 0) {
+              console.log(chalk.yellow('\nNo repositories found. Please create one first.'));
+              return;
+            }
+
+            const repoChoices = repos.map(repo => ({
+              name: `${repo.full_name} (${repo.private ? 'Private' : 'Public'})`,
+              value: repo.full_name
+            }));
+
+            const { selectedRepo } = await inquirer.prompt([
+              {
+                type: 'list',
+                name: 'selectedRepo',
+                message: 'Select a repository:',
+                choices: repoChoices
+              }
+            ]);
+
+            // Add remote with token
+            const token = await getToken('github_access_token');
+            if (token) {
+              const remoteUrl = `https://x-access-token:${token}@github.com/${selectedRepo}.git`;
+              await gitService.addRemote('origin', remoteUrl, '.');
+              console.log(chalk.green('\nRemote origin added with authentication'));
+            } else {
+              const remoteUrl = `https://github.com/${selectedRepo}.git`;
+              await gitService.addRemote('origin', remoteUrl, '.');
+              console.log(chalk.green('\nRemote origin added'));
+            }
+
+          } else if (action === 'manual') {
+            // Manual remote URL entry
+            const { name } = await inquirer.prompt([
+              { 
+                type: 'input', 
+                name: 'name', 
+                message: 'Remote name:',
+                default: 'origin'
+              }
+            ]);
+            const { url } = await inquirer.prompt([
+              { 
+                type: 'input', 
+                name: 'url', 
+                message: 'Remote URL:',
+                validate: input => input.trim() !== '' || 'URL is required'
+              }
+            ]);
+            const result = await gitService.addRemote(name, url, '.');
+            console.log(chalk.green(result));
+          }
         } catch (error) {
           console.error(chalk.red('Error adding remote:'), error.message);
         }
