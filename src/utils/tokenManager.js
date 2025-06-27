@@ -1,7 +1,7 @@
 import configManager from './configManager.js';
 import crypto from 'crypto';
 
-const ENCRYPTION_KEY = process.env.GITMATE_ENCRYPTION_KEY || 'gitmate-default-key-32byteslong!'; // Must be 32 bytes
+const ENCRYPTION_KEY = "12345678901234567890123456789012"; // Must be the same as backend and auth server
 const IV_LENGTH = 16;
 
 function encrypt(text) {
@@ -13,14 +13,20 @@ function encrypt(text) {
 }
 
 function decrypt(text) {
-  if (!text || typeof text !== 'string' || !text.includes(':')) return text;
-  const [ivHex, encryptedHex] = text.split(':');
-  const iv = Buffer.from(ivHex, 'hex');
-  const encryptedText = Buffer.from(encryptedHex, 'hex');
-  const decipher = crypto.createDecipheriv('aes-256-cbc', Buffer.from(ENCRYPTION_KEY, 'utf8'), iv);
-  let decrypted = decipher.update(encryptedText);
-  decrypted = Buffer.concat([decrypted, decipher.final()]);
-  return decrypted.toString('utf8');
+  try {
+    if (!text || typeof text !== 'string' || !text.includes(':')) return text;
+    const [ivHex, encryptedHex] = text.split(':');
+    if (!ivHex || !encryptedHex) return text; // Not encrypted
+    const iv = Buffer.from(ivHex, 'hex');
+    const encryptedText = Buffer.from(encryptedHex, 'hex');
+    const decipher = crypto.createDecipheriv('aes-256-cbc', Buffer.from(ENCRYPTION_KEY, 'utf8'), iv);
+    let decrypted = decipher.update(encryptedText);
+    decrypted = Buffer.concat([decrypted, decipher.final()]);
+    return decrypted.toString('utf8');
+  } catch (error) {
+    console.error('Decryption error:', error);
+    return null;
+  }
 }
 
 export async function getToken(key) {
@@ -35,8 +41,16 @@ export async function storeToken(key, value) {
     await configManager.setToken(key, value);
     return;
   }
-  const encrypted = encrypt(value);
-  await configManager.setToken(key, encrypted);
+  
+  // Check if the value is already encrypted (contains ':' separator)
+  if (typeof value === 'string' && value.includes(':')) {
+    // Already encrypted, store as-is
+    await configManager.setToken(key, value);
+  } else {
+    // Not encrypted, encrypt it
+    const encrypted = encrypt(value);
+    await configManager.setToken(key, encrypted);
+  }
 }
 
 export async function clearToken(key) {

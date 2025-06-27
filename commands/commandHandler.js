@@ -51,20 +51,29 @@ async function ensureAuthenticated() {
     UI.error('Authentication Required',
       'You need to authenticate with GitHub to use this feature.');
     UI.info('Follow these steps:',
-      `1. Please open your browser and navigate to: ${authInitiateUrl}\n2. Authorize the application\n3. Paste the token below:`);
+      `1. Please open your browser and navigate to: ${authInitiateUrl}\n2. Authorize the application\n3. Paste the encrypted token below:`);
 
     const { token: enteredToken } = await inquirer.prompt([
       {
         type: 'password',
         name: 'token',
-        message: 'Paste the token you received from the browser:',
+        message: 'Paste the encrypted token you received from the browser:',
         mask: '*',
         validate: input => input.trim() !== '' || 'Token is required',
       },
     ]);
+    
+    // Store the encrypted token as-is
+    await storeToken('github_access_token', enteredToken.trim());
+    
+    // Now decrypt it for use
     const decryptedToken = decrypt(enteredToken.trim());
-    console.log(decryptedToken);
-    await storeToken('github_access_token', decryptedToken);
+    if (!decryptedToken) {
+      UI.error('Invalid Token', 'The token you provided could not be decrypted. Please try again.');
+      process.exitCode = 1;
+      return null;
+    }
+    
     token = decryptedToken;
   }
   return token;
