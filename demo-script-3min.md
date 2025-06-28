@@ -23,7 +23,7 @@ GitMate solves this by understanding your intent. Built with advanced AI, it int
 
 "Getting started takes just two commands:
 ```
-npm install -g gitmate
+npm install -g sushil-gitmate
 gitmate init
 ```
 
@@ -92,7 +92,7 @@ What used to take multiple commands and careful syntax now flows naturally. Focu
 
 Install GitMate today:
 ```
-npm install -g gitmate
+npm install -g sushil-gitmate
 ```
 
 Visit our GitHub repository for documentation and examples.

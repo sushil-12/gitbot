@@ -38,7 +38,7 @@ Built with advanced AI technology, GitMate interprets your intent and executes t
 
 "Getting started with GitMate is incredibly simple. Just run:
 ```
-npm install -g gitmate
+npm install -g sushil-gitmate
 gitmate init
 ```
 
@@ -254,7 +254,7 @@ If something goes wrong, GitMate provides helpful error messages and suggests so
 
 Install GitMate today with:
 ```
-npm install -g gitmate
+npm install -g sushil-gitmate
 ```
 
 Visit our GitHub repository for documentation, examples, and community support.

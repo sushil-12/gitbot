@@ -417,6 +417,12 @@ async function handleAiIntent(userInput) {
       case 'show_git_config':
         await handleGitConfig(['show']);
         break;
+      case 'create_pr':
+        {
+          const { executeGitOperation } = await import('../commands/commandHandler.js');
+          await executeGitOperation({ intent, entities }, 'User');
+        }
+        break;
       // Add more intent handlers as needed
       default:
         // If intent is not mapped, fallback to NLP handler for conversational response

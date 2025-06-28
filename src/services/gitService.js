@@ -166,6 +166,12 @@ export async function pushChanges(remoteName = 'origin', branchName, directoryPa
     const currentBranch = branchName || (await git.branchLocal()).current;
     if (!currentBranch) throw new Error('No branch to push');
 
+    // Check if the branch exists locally
+    const branches = await git.branchLocal();
+    if (!branches.all.includes(currentBranch)) {
+      throw new Error(`Branch "${currentBranch}" does not exist locally. Please create it first.`);
+    }
+
     // Inject token for GitHub remotes
     if (remoteName === 'origin') {
       await ensureAuthenticatedRemote(directoryPath);
@@ -174,6 +180,11 @@ export async function pushChanges(remoteName = 'origin', branchName, directoryPa
     const pushOptions = [];
     if (options.setUpstream) pushOptions.push('--set-upstream');
     if (options.force) pushOptions.push('--force');
+
+    // For new branches, always use --set-upstream
+    if (options.setUpstream || !branches.current) {
+      pushOptions.push('--set-upstream');
+    }
 
     await git.push(remoteName, currentBranch, pushOptions);
 
@@ -190,6 +201,8 @@ export async function pushChanges(remoteName = 'origin', branchName, directoryPa
       errMsg += '\nSolution: Pull changes first or use --force to overwrite';
     } else if (error.message.includes('authentication failed')) {
       errMsg += '\nSolution: Check your GitHub token using "gitmate config view"';
+    } else if (error.message.includes('src refspec')) {
+      errMsg += '\nSolution: Ensure the branch exists and has commits before pushing';
     }
 
     logger.error(errMsg, { stack: error.stack, service: serviceName });
@@ -669,6 +682,28 @@ export async function listBranches(directoryPath = '.') {
     return branches.all;
   } catch (error) {
     throw new Error(`Failed to list branches: ${error.message}`);
+  }
+}
+
+/**
+ * Get remote branch list
+ */
+export async function listRemoteBranches(directoryPath = '.') {
+  const git = simpleGit(directoryPath);
+  try {
+    const branches = await git.branch(['-r']);
+    logger.info(`Remote branches found: ${branches.all?.length || 0}`, { 
+      branches: branches.all, 
+      service: serviceName 
+    });
+    return branches.all || [];
+  } catch (error) {
+    logger.error('Failed to list remote branches:', { 
+      error: error.message, 
+      stack: error.stack, 
+      service: serviceName 
+    });
+    throw new Error(`Failed to list remote branches: ${error.message}`);
   }
 }
 

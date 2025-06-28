@@ -183,6 +183,13 @@ function detectConversationType(query) {
   if (githubKeywords.some(k => lowerQuery.includes(k))) {
     return { type: CONVERSATION_TYPES.GITHUB_OPERATION, response: null, immediate: false };
   }
+
+  // Pull request specific detection
+  if (lowerQuery.includes('pr') || lowerQuery.includes('pull request') || 
+      lowerQuery.includes('merge request') || lowerQuery.includes('create pr') ||
+      lowerQuery.includes('create pull request') || lowerQuery.includes('create merge request')) {
+    return { type: CONVERSATION_TYPES.GITHUB_OPERATION, response: null, immediate: false };
+  }
   
   // Check if it's unrelated to Git/GitHub
   const unrelatedKeywords = ['weather', 'time', 'date', 'calculator', 'math', 'translate', 'search'];
@@ -352,10 +359,16 @@ export const aiService = {
       - "push changes" = git push
       - "pull changes" = git pull
       - "commit changes" = git commit
+      - "create pr" = create_pull_request
+      - "create pull request" = create_pull_request
+      - "create merge request" = create_pull_request
+      - "make a pr" = create_pull_request
+      - "open a pr" = create_pull_request
+      - "can you create a pr" = create_pull_request
       
       Return a JSON object with:
-      - intent: The main action (list_repos, list_branches, git_status, git_diff, git_log, push_changes, etc.)
-      - entities: Object with relevant parameters (branch, commit_message, files, etc.)
+      - intent: The main action (list_repos, list_branches, git_status, git_diff, git_log, push_changes, create_pr, etc.)
+      - entities: Object with relevant parameters (branch, commit_message, files, head_branch, base_branch, title, body, etc.)
       - confidence: Your confidence score (0-1)
       
       Return only valid JSON:`;

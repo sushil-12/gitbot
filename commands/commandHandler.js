@@ -1310,33 +1310,133 @@ export async function executeGitOperation(intentObj, userName) {
           }
         }
 
-        // Determine target branch
+        // Determine target branch first
         let targetBranch = entities.branch || 'current';
         const currentBranch = currentStatus.current || 'main';
 
         if (targetBranch === 'current') {
           targetBranch = currentBranch;
+        } else if (targetBranch === 'new') {
+          // Generate a new branch name based on current changes or user input
+          const { newBranchName } = await inquirer.prompt([
+            {
+              type: 'input',
+              name: 'newBranchName',
+              message: 'Enter name for the new branch:',
+              default: `feature/${new Date().toISOString().split('T')[0]}-changes`,
+              validate: input => input.trim() !== '' || 'Branch name cannot be empty'
+            }
+          ]);
+          targetBranch = newBranchName.trim();
         }
 
-        // Handle branch switching if needed
+        // Handle branch switching BEFORE committing changes
         if (targetBranch !== currentBranch) {
-          const branches = await gitService.listBranches('.');
+          try {
+            const branches = await gitService.listBranches('.');
+            const branchList = Array.isArray(branches) ? branches : [];
 
-          if (!branches.all.includes(targetBranch)) {
-            const shouldCreate = await prompter.askYesNo(
-              `Branch "${targetBranch}" doesn't exist. Create it?`,
-              true
-            );
+            if (!branchList.includes(targetBranch)) {
+              const shouldCreate = await prompter.askYesNo(
+                `Branch "${targetBranch}" doesn't exist. Create it?`,
+                true
+              );
 
-            if (shouldCreate) {
-              await gitService.createAndCheckoutBranch(targetBranch, '.');
-              console.log(chalk.green(`\nCreated and switched to branch "${targetBranch}"`));
+              if (shouldCreate) {
+                // Create the new branch first
+                await gitService.createAndCheckoutBranch(targetBranch, '.');
+                console.log(chalk.green(`\nCreated and switched to branch "${targetBranch}"`));
+              } else {
+                return;
+              }
             } else {
-              return;
+              await gitService.checkoutBranch(targetBranch, '.');
+              console.log(chalk.green(`\nSwitched to branch "${targetBranch}"`));
             }
-          } else {
-            await gitService.checkoutBranch(targetBranch, '.');
-            console.log(chalk.green(`\nSwitched to branch "${targetBranch}"`));
+            
+            // Refresh status after branch switch
+            currentStatus = await gitService.getStatus('.');
+          } catch (error) {
+            console.error(chalk.red(`\nError handling branch "${targetBranch}": ${error.message}`));
+            return;
+          }
+        }
+
+        // Handle unstaged changes AFTER branch switch
+        if (currentStatus.not_added.length > 0 || currentStatus.modified.length > 0) {
+          console.log(chalk.yellow('\nYou have unstaged changes:'));
+
+          const unstagedSummary = [
+            ...currentStatus.not_added.map(f => chalk.gray(`  ${f} (untracked)`)),
+            ...currentStatus.modified.map(f => chalk.yellow(`  ${f} (modified)`)),
+            ...currentStatus.deleted.map(f => chalk.red(`  ${f} (deleted)`))
+          ].join('\n');
+
+          console.log(unstagedSummary);
+
+          const shouldStage = await prompter.askYesNo(
+            'Would you like to stage and commit these changes before pushing?',
+            true
+          );
+
+          if (shouldStage) {
+            // Interactive file selection instead of automatic staging
+            const unStagedFiles = [
+              ...currentStatus.not_added.map(f => ({ name: `${f} (Untracked)`, value: f })),
+              ...currentStatus.modified.map(f => ({ name: `${f} (Modified)`, value: f })),
+              ...currentStatus.deleted.map(f => ({ name: `${f} (Deleted)`, value: f }))
+            ];
+
+            const { filesToAdd } = await inquirer.prompt([
+              {
+                type: 'checkbox',
+                name: 'filesToAdd',
+                message: 'Select files to stage for commit:',
+                choices: [
+                  new inquirer.Separator('=== Unstaged Changes ==='),
+                  ...unStagedFiles,
+                  new inquirer.Separator(),
+                  { name: 'All Changes', value: 'all' }
+                ],
+                pageSize: Math.min(15, unStagedFiles.length + 4),
+                validate: answer => answer.length > 0 || 'You must choose at least one file.'
+              }
+            ]);
+
+            const files = filesToAdd.includes('all') ? ['.'] : filesToAdd;
+            await gitService.addFiles(files, '.');
+            
+            // Fix file counting - if "all" was selected, count the actual files
+            const actualFileCount = filesToAdd.includes('all') ? unStagedFiles.length : filesToAdd.length;
+            console.log(chalk.green(`\nStaged ${actualFileCount} file(s) for commit`));
+
+            // Generate suggested commit message from diff
+            let suggestedMessage = '';
+            try {
+              const diff = await gitService.getDiff('--cached');
+              suggestedMessage = await aiService.generateCommitMessage(diff);
+            } catch (error) {
+              logger.warn('Failed to generate commit message', { error });
+            }
+
+            // Improved commit message handling
+            const { commitMessage } = await inquirer.prompt([
+              {
+                type: 'input',
+                name: 'commitMessage',
+                message: suggestedMessage
+                  ? `Commit message (press enter to use suggested or edit):`
+                  : 'Enter commit message:',
+                default: suggestedMessage || '',
+                validate: input => input.trim() !== '' || 'Commit message cannot be empty'
+              }
+            ]);
+
+            await handleGitCommand(['commit', '-m', commitMessage.trim()], '.');
+            console.log(chalk.green(`\nChanges committed with message: "${commitMessage.trim()}"`));
+
+            // Refresh status
+            currentStatus = await gitService.getStatus('.');
           }
         }
 
@@ -1364,10 +1464,10 @@ export async function executeGitOperation(intentObj, userName) {
             }
           }
         } catch (pushError) {
-          console.error(chalk.red(`\nPush failed: ${pushError.message}`));
+          console.error(chalk.red(`\nPush failed: ${pushError?.message || 'Unknown error'}`));
 
           // Handle case where no remote exists
-          if (pushError.message.includes("'origin' does not appear to be a git repository")) {
+          if (pushError?.message && pushError.message.includes("'origin' does not appear to be a git repository")) {
             console.log(chalk.yellow('\nNo remote repository configured. Let\'s set one up!'));
             
             const { action } = await inquirer.prompt([
@@ -1498,9 +1598,9 @@ export async function executeGitOperation(intentObj, userName) {
             }
           } else {
             // Provide helpful suggestions for other push errors
-            if (pushError.message.includes('no upstream branch')) {
+            if (pushError?.message && pushError.message.includes('no upstream branch')) {
               console.log(chalk.yellow('\nTry: git push --set-upstream origin', targetBranch));
-            } else if (pushError.message.includes('updates were rejected')) {
+            } else if (pushError?.message && pushError.message.includes('updates were rejected')) {
               console.log(chalk.yellow('\nTry: git pull first to merge remote changes'));
             }
           }
@@ -1873,6 +1973,163 @@ export async function executeGitOperation(intentObj, userName) {
         break;
       }
 
+      case 'create_pr': {
+        try {
+          // Get current branch as source branch
+          const currentBranch = await gitService.getCurrentBranch('.');
+          const sourceBranch = entities.head_branch || currentBranch;
+          const targetBranch = entities.base_branch || 'main';
+          
+          // Get PR title from user if not provided
+          let title = entities.title;
+          if (!title) {
+            const { prTitle } = await inquirer.prompt([
+              {
+                type: 'input',
+                name: 'prTitle',
+                message: 'Pull request title:',
+                default: `Merge ${sourceBranch} into ${targetBranch}`,
+                validate: input => input.trim() !== '' || 'Title cannot be empty'
+              }
+            ]);
+            title = prTitle.trim();
+          }
+
+          // Get PR description from user if not provided
+          let body = entities.body || '';
+          if (!body) {
+            const { prBody } = await inquirer.prompt([
+              {
+                type: 'input',
+                name: 'prBody',
+                message: 'Pull request description (optional):',
+                default: ''
+              }
+            ]);
+            body = prBody.trim();
+          }
+
+          // Get repository info
+          const repoInfo = await gitService.getRemoteInfo('.');
+          const [owner, repo] = repoInfo.split('/');
+
+          // Check if source branch exists on remote
+          console.log(chalk.blue(`\nChecking if branch '${sourceBranch}' exists on remote...`));
+          try {
+            const remoteBranches = await gitService.listRemoteBranches('.');
+            
+            // Ensure we have a valid array
+            if (!Array.isArray(remoteBranches)) {
+              console.log(chalk.yellow('\nCould not get remote branch list. Attempting to push the branch anyway...'));
+              await gitService.pushChanges('origin', sourceBranch, '.', { setUpstream: true });
+              console.log(chalk.green(`\n✅ Successfully pushed '${sourceBranch}' to remote.`));
+            } else {
+              const sourceBranchRemote = `origin/${sourceBranch}`;
+              
+              if (!remoteBranches.includes(sourceBranchRemote)) {
+                console.log(chalk.yellow(`\nBranch '${sourceBranch}' doesn't exist on remote yet.`));
+                const shouldPush = await prompter.askYesNo(`Would you like to push '${sourceBranch}' to remote first?`, true);
+                
+                if (shouldPush) {
+                  console.log(chalk.blue(`\nPushing '${sourceBranch}' to remote...`));
+                  await gitService.pushChanges('origin', sourceBranch, '.', { setUpstream: true });
+                  console.log(chalk.green(`\n✅ Successfully pushed '${sourceBranch}' to remote.`));
+                } else {
+                  console.log(chalk.yellow('\nCannot create pull request without pushing the branch first.'));
+                  return;
+                }
+              } else {
+                console.log(chalk.green(`\n✅ Branch '${sourceBranch}' exists on remote.`));
+              }
+            }
+          } catch (error) {
+            console.log(chalk.yellow(`\nCould not check remote branches: ${error.message}`));
+            console.log(chalk.yellow('Attempting to push the branch anyway...'));
+            
+            try {
+              await gitService.pushChanges('origin', sourceBranch, '.', { setUpstream: true });
+              console.log(chalk.green(`\n✅ Successfully pushed '${sourceBranch}' to remote.`));
+            } catch (pushError) {
+              console.error(chalk.red(`\nFailed to push branch: ${pushError.message}`));
+              return;
+            }
+          }
+
+          console.log(chalk.blue(`\nCreating pull request from ${sourceBranch} to ${targetBranch}...`));
+          
+          // Debug: Check if both branches exist on remote
+          try {
+            const remoteBranches = await gitService.listRemoteBranches('.');
+            if (Array.isArray(remoteBranches)) {
+              console.log(chalk.blue('\nAvailable remote branches:'));
+              remoteBranches.forEach(branch => console.log(chalk.gray(`  ${branch}`)));
+              
+              const sourceExists = remoteBranches.includes(`origin/${sourceBranch}`);
+              const targetExists = remoteBranches.includes(`origin/${targetBranch}`);
+              
+              console.log(chalk.blue(`\nSource branch '${sourceBranch}' exists: ${sourceExists ? '✅' : '❌'}`));
+              console.log(chalk.blue(`Target branch '${targetBranch}' exists: ${targetExists ? '✅' : '❌'}`));
+              
+              if (!sourceExists) {
+                console.log(chalk.red(`\n❌ Source branch '${sourceBranch}' does not exist on remote.`));
+                return;
+              }
+              
+              if (!targetExists) {
+                console.log(chalk.red(`\n❌ Target branch '${targetBranch}' does not exist on remote.`));
+                const createTarget = await prompter.askYesNo(`Would you like to create the '${targetBranch}' branch on remote?`, true);
+                if (createTarget) {
+                  // Switch to target branch and push it
+                  const currentBranch = await gitService.getCurrentBranch('.');
+                  if (currentBranch !== targetBranch) {
+                    await gitService.checkoutBranch(targetBranch, '.');
+                  }
+                  await gitService.pushChanges('origin', targetBranch, '.', { setUpstream: true });
+                  console.log(chalk.green(`\n✅ Successfully created and pushed '${targetBranch}' to remote.`));
+                } else {
+                  return;
+                }
+              }
+            }
+          } catch (error) {
+            console.log(chalk.yellow(`\nCould not verify remote branches: ${error.message}`));
+          }
+          
+          // Create the pull request
+          const pullRequest = await githubService.createPullRequest(owner, repo, title, sourceBranch, targetBranch, body);
+          
+          console.log(chalk.green(`\n✅ Pull request created successfully!`));
+          console.log(chalk.blue(`Title: ${pullRequest.title}`));
+          console.log(chalk.blue(`URL: ${pullRequest.html_url}`));
+          console.log(chalk.blue(`Number: #${pullRequest.number}`));
+          
+          // Offer to open the PR in browser
+          const shouldOpen = await prompter.askYesNo('\nWould you like to open the pull request in your browser?', true);
+          if (shouldOpen) {
+            try {
+              const open = await import('open');
+              await open.default(pullRequest.html_url);
+            } catch (openError) {
+              console.log(chalk.yellow('\nCould not open browser automatically. Please open the URL manually:'));
+              console.log(chalk.blue(pullRequest.html_url));
+            }
+          }
+
+        } catch (error) {
+          console.error(chalk.red('Error creating pull request:'), error.message);
+          
+          // Provide helpful error messages
+          if (error.message.includes('422')) {
+            console.log(chalk.yellow('\nThis usually means:'));
+            console.log(chalk.yellow('• The source branch doesn\'t exist on the remote'));
+            console.log(chalk.yellow('• The target branch doesn\'t exist'));
+            console.log(chalk.yellow('• There are no differences between the branches'));
+            console.log(chalk.yellow('• You don\'t have permission to create PRs in this repository'));
+          }
+        }
+        break;
+      }
+
       default:
         console.log(chalk.yellow(`\nOperation "${intent}" is not yet implemented.`));
         console.log(chalk.blue('\nSupported operations:'));
@@ -1902,6 +2159,7 @@ export async function executeGitOperation(intentObj, userName) {
   • get_diff_between_branches - Show diff between branches
   • revert_commit        - Revert a specific commit
   • create_and_checkout_branch - Create and switch to a branch
+  • create_pr            - Create a pull request
 `);
         break;
     }
