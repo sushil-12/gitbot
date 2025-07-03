@@ -81,7 +81,6 @@ async function getMistralClient() {
           throw new Error(`Mistral Proxy error: ${response.status} ${await response.text()}`);
         }
         const data = await response.json();
-        console.log('🔍 Mistral response:', data.choices[0].message);
         // Better response handling
         if (data.choices && data.choices[0] && data.choices[0].message && data.choices[0].message.content) {
           return data.choices[0].message.content;
@@ -425,7 +424,6 @@ JSON response:`;
 
       const response = await this.generateResponse(prompt, { max_tokens: 200, temperature: 0.1 });
       
-      console.log('🔍 Intent parsing response:', response);
       
       let parsed;
       try {
@@ -436,26 +434,21 @@ JSON response:`;
         } else if (jsonContent.startsWith('```')) {
           jsonContent = jsonContent.replace(/^```\s*/, '').replace(/\s*```$/, '');
         }
-        console.log('🔍 Cleaned JSON content:', jsonContent);
         parsed = JSON.parse(jsonContent);
-      } catch (parseError) {
-        console.log('🔍 JSON parse error:', parseError.message);
-        // Try to extract JSON from the response
-        const jsonMatch = response.match(/\{[\s\S]*\}/);
-        if (jsonMatch) {
-          try {
-            parsed = JSON.parse(jsonMatch[0]);
-            console.log('🔍 Extracted JSON from response');
-          } catch (secondError) {
-            console.log('🔍 Failed to parse extracted JSON, using fallback');
+              } catch (parseError) {
+          // Try to extract JSON from the response
+          const jsonMatch = response.match(/\{[\s\S]*\}/);
+          if (jsonMatch) {
+            try {
+              parsed = JSON.parse(jsonMatch[0]);
+            } catch (secondError) {
+              parsed = this.fallbackIntentDetection(query);
+            }
+          } else {
+            // Fallback to keyword-based intent detection
             parsed = this.fallbackIntentDetection(query);
           }
-        } else {
-          console.log('🔍 No JSON found in response, using fallback');
-          // Fallback to keyword-based intent detection
-          parsed = this.fallbackIntentDetection(query);
         }
-      }
 
       // Add default values for common entities
       parsed.entities = parsed.entities || {};
@@ -480,7 +473,6 @@ JSON response:`;
         if (!isRepoListing || !isListingAction) {
           const correctedIntent = this.determineCorrectIntent(query);
           if (correctedIntent && correctedIntent !== 'list_repos') {
-            console.log(`🔍 Corrected list_repo → ${correctedIntent}`);
             parsed.intent = correctedIntent;
             parsed.entities = {};
           }
@@ -491,7 +483,6 @@ JSON response:`;
       if (parsed.intent === 'git_add' && query.toLowerCase().includes('init')) {
         parsed.intent = 'git_init';
         parsed.entities = {};
-        console.log('🔍 Corrected git_add → git_init');
       }
       
       // Fix unknown intent for authentication and help
@@ -499,28 +490,23 @@ JSON response:`;
         const lowerQuery = query.toLowerCase();
         if (lowerQuery.includes('login') || lowerQuery.includes('logout') || lowerQuery.includes('authenticate')) {
           parsed.intent = 'greeting';
-          console.log('🔍 Corrected unknown → greeting');
         } else if (lowerQuery.includes('help') || lowerQuery.includes('what can') || lowerQuery.includes('how do i')) {
           parsed.intent = 'help';
-          console.log('🔍 Corrected unknown → help');
         }
       }
       
       // Fix greeting intent for help queries
       if (parsed.intent === 'greeting' && query.toLowerCase().includes('how do i')) {
         parsed.intent = 'help';
-        console.log('🔍 Corrected greeting → help');
       }
       
       // Fix pull_changes for pull request queries
       if (parsed.intent === 'pull_changes' && 
           (query.toLowerCase().includes('pull request') || query.toLowerCase().includes('pr'))) {
         parsed.intent = 'create_pr';
-        console.log('🔍 Corrected pull_changes → create_pr');
       }
 
       aiResponseCache.set(cacheKey, parsed);
-      console.log('🔍 Final parsed intent:', parsed);
       return parsed;
     } catch (error) {
       if (error.message && error.message.includes('429')) {
@@ -529,7 +515,6 @@ JSON response:`;
       }
 
       logger.error('Intent parsing failed:', { message: error.message, service: serviceName });
-      console.log('🔍 Intent parsing error:', { message: error.message, service: serviceName });
       return { intent: 'unknown', entities: { error: error.message } };
     }
   },
@@ -546,7 +531,6 @@ JSON response:`;
           lowerQuery.includes('my repositories') || lowerQuery.includes('my repos')) {
         parsed.intent = 'list_repos';
         parsed.entities = {}; // Clear incorrect entities
-        console.log('🔍 Corrected create_repo → list_repos');
       }
     }
     
@@ -556,7 +540,6 @@ JSON response:`;
          lowerQuery.includes('what\'s changed') || lowerQuery.includes('current status'))) {
       parsed.intent = 'git_status';
       parsed.entities = {};
-      console.log('🔍 Corrected create_repo → git_status');
     }
     
     // Fix git diff misclassifications
@@ -564,7 +547,6 @@ JSON response:`;
         (lowerQuery.includes('diff') || lowerQuery.includes('differences'))) {
       parsed.intent = 'git_diff';
       parsed.entities = {};
-      console.log('🔍 Corrected create_repo → git_diff');
     }
     
     // Fix list_branches misclassifications
@@ -572,21 +554,18 @@ JSON response:`;
         (lowerQuery.includes('branches') && (lowerQuery.includes('list') || lowerQuery.includes('show')))) {
       parsed.intent = 'list_branches';
       parsed.entities = {};
-      console.log('🔍 Corrected create_repo → list_branches');
     }
     
     // Fix push_changes misclassifications
     if (parsed.intent === 'create_repo' && lowerQuery.includes('push')) {
       parsed.intent = 'push_changes';
       parsed.entities = { branch: 'current', remote: 'origin' };
-      console.log('🔍 Corrected create_repo → push_changes');
     }
     
     // Fix pull_changes misclassifications
     if (parsed.intent === 'create_repo' && lowerQuery.includes('pull')) {
       parsed.intent = 'pull_changes';
       parsed.entities = { remote: 'origin' };
-      console.log('🔍 Corrected create_repo → pull_changes');
     }
     
     // Fix create_pr misclassifications
@@ -595,7 +574,6 @@ JSON response:`;
          lowerQuery.includes('merge request'))) {
       parsed.intent = 'create_pr';
       parsed.entities = {};
-      console.log('🔍 Corrected create_repo → create_pr');
     }
     
     // Fix help misclassifications
@@ -604,7 +582,6 @@ JSON response:`;
          lowerQuery.includes('capabilities'))) {
       parsed.intent = 'help';
       parsed.entities = {};
-      console.log('🔍 Corrected create_repo → help');
     }
     
     // Fix git_add misclassifications
@@ -612,7 +589,6 @@ JSON response:`;
         (lowerQuery.includes('stage') || lowerQuery.includes('add') && !lowerQuery.includes('push'))) {
       parsed.intent = 'git_add';
       parsed.entities = {};
-      console.log('🔍 Corrected push_changes → git_add');
     }
     
     return parsed;

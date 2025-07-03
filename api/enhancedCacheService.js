@@ -150,12 +150,10 @@ class EnhancedQueryCacheService {
 
   async findSimilarQuery(userQuery) {
     if (!this.isConnected) {
-      console.log('⚠️ Cache service not connected, skipping cache lookup');
       return null;
     }
 
     const normalizedQuery = userQuery.toLowerCase().trim();
-    console.log(`🔍 Looking for similar query: "${normalizedQuery}"`);
 
     // 1. Exact match (fastest)
     let cached = await this.getExactMatch(normalizedQuery);

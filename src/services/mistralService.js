@@ -163,7 +163,6 @@ export async function generateResponse(prompt, systemMessage = null, options = {
 }
 
 export async function parseIntent(naturalLanguageQuery) {
-  console.log("naturalLanguageQuery in mistral service", naturalLanguageQuery);
   const systemPrompt = `You are an expert at interpreting natural language commands and conversations.
 Your primary task is to:
 1. Identify if the user is asking about Git/GitHub operations

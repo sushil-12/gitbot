@@ -1128,7 +1128,6 @@ export async function handleAuth(args) {
 
 export async function handleNlpCommand(query) {
   logger.info(`Handling NLP query: "${query}"`, { service: serviceName });
-  console.log(query);
   if (!query || query.trim() === '') {
     console.error("NLP query cannot be empty.");
     return;
@@ -1285,7 +1284,6 @@ export async function handleNlpCommand(query) {
 
 export async function executeGitOperation(intentObj, userName) {
   const { intent, entities = {} } = intentObj;
-  console.log(intentObj);
   // Normalize intent for common variants
   let normalizedIntent = intent;
   if ([
