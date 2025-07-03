@@ -68,8 +68,8 @@ async function getAnthropicClient() {
 
 async function getMistralClient() {
   if (!mistralClient) {
-    // const mistralProxyUrl ='https://gitbot-1-24a9.onrender.com/api/mistral';
-    const mistralProxyUrl = 'http://localhost:3000/api/mistral';
+    const mistralProxyUrl ='https://gitbot-1-24a9.onrender.com/api/mistral';
+    // const mistralProxyUrl = 'http://localhost:3000/api/mistral';
     mistralClient = {
       async chat(messages, options = {}) {
         const response = await fetch(mistralProxyUrl, {
