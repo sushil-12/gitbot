@@ -1,0 +1,904 @@
+{
+  "summary": {
+    "totalTests": 39,
+    "totalSuccessful": 38,
+    "totalFailed": 1,
+    "overallSuccessRate": "97.4%",
+    "duration": "27.326s",
+    "timestamp": "2025-07-03T11:35:28.043Z"
+  },
+  "categoryResults": {
+    "Repository Listing": {
+      "total": 4,
+      "successful": 4,
+      "failed": 0,
+      "successRate": "100.0%",
+      "results": [
+        {
+          "category": "Repository Listing",
+          "query": "List all my GitHub repositories",
+          "expected": "list_repos",
+          "actual": "list_repos",
+          "confidence": 0.9,
+          "success": true,
+          "entities": {},
+          "timestamp": "2025-07-03T11:35:00.909Z"
+        },
+        {
+          "category": "Repository Listing",
+          "query": "Show my repositories",
+          "expected": "list_repos",
+          "actual": "list_repos",
+          "confidence": 0.9,
+          "success": true,
+          "entities": {},
+          "timestamp": "2025-07-03T11:35:01.564Z"
+        },
+        {
+          "category": "Repository Listing",
+          "query": "What repositories do I have?",
+          "expected": "list_repos",
+          "actual": "list_repos",
+          "confidence": 0.9,
+          "success": true,
+          "entities": {},
+          "timestamp": "2025-07-03T11:35:02.225Z"
+        },
+        {
+          "category": "Repository Listing",
+          "query": "Display all my repos",
+          "expected": "list_repos",
+          "actual": "list_repos",
+          "confidence": 0.9,
+          "success": true,
+          "entities": {},
+          "timestamp": "2025-07-03T11:35:03.048Z"
+        }
+      ]
+    },
+    "Git Status & Changes": {
+      "total": 4,
+      "successful": 3,
+      "failed": 1,
+      "successRate": "75.0%",
+      "results": [
+        {
+          "category": "Git Status & Changes",
+          "query": "Show me the current status",
+          "expected": "git_status",
+          "actual": "git_status",
+          "confidence": 0.9,
+          "success": true,
+          "entities": {},
+          "timestamp": "2025-07-03T11:35:04.059Z"
+        },
+        {
+          "category": "Git Status & Changes",
+          "query": "What's changed in my repository?",
+          "expected": "git_status",
+          "actual": "list_repos",
+          "confidence": 0.9,
+          "success": false,
+          "entities": {},
+          "timestamp": "2025-07-03T11:35:05.086Z"
+        },
+        {
+          "category": "Git Status & Changes",
+          "query": "Show me the differences",
+          "expected": "git_diff",
+          "actual": "git_diff",
+          "confidence": 0.9,
+          "success": true,
+          "entities": {},
+          "timestamp": "2025-07-03T11:35:05.901Z"
+        },
+        {
+          "category": "Git Status & Changes",
+          "query": "Display the git status",
+          "expected": "git_status",
+          "actual": "git_status",
+          "confidence": 0.9,
+          "success": true,
+          "entities": {},
+          "timestamp": "2025-07-03T11:35:06.611Z"
+        }
+      ]
+    },
+    "Branch Management": {
+      "total": 5,
+      "successful": 5,
+      "failed": 0,
+      "successRate": "100.0%",
+      "results": [
+        {
+          "category": "Branch Management",
+          "query": "List all branches",
+          "expected": "list_branches",
+          "actual": "list_branches",
+          "confidence": 0.9,
+          "success": true,
+          "entities": {},
+          "timestamp": "2025-07-03T11:35:07.293Z"
+        },
+        {
+          "category": "Branch Management",
+          "query": "Show my branches",
+          "expected": "list_branches",
+          "actual": "list_branches",
+          "confidence": 0.9,
+          "success": true,
+          "entities": {},
+          "timestamp": "2025-07-03T11:35:07.976Z"
+        },
+        {
+          "category": "Branch Management",
+          "query": "Create a new branch called feature-login",
+          "expected": "create_branch",
+          "actual": "create_branch",
+          "confidence": 0.9,
+          "success": true,
+          "entities": {
+            "branch_name": "feature-login"
+          },
+          "timestamp": "2025-07-03T11:35:08.583Z"
+        },
+        {
+          "category": "Branch Management",
+          "query": "Switch to the main branch",
+          "expected": "checkout_branch",
+          "actual": "checkout_branch",
+          "confidence": 0.9,
+          "success": true,
+          "entities": {
+            "branch_name": "main"
+          },
+          "timestamp": "2025-07-03T11:35:09.162Z"
+        },
+        {
+          "category": "Branch Management",
+          "query": "Checkout the develop branch",
+          "expected": "checkout_branch",
+          "actual": "checkout_branch",
+          "confidence": 0.9,
+          "success": true,
+          "entities": {
+            "branch_name": "develop"
+          },
+          "timestamp": "2025-07-03T11:35:09.741Z"
+        }
+      ]
+    },
+    "Commit & Push": {
+      "total": 5,
+      "successful": 5,
+      "failed": 0,
+      "successRate": "100.0%",
+      "results": [
+        {
+          "category": "Commit & Push",
+          "query": "Stage all my changes",
+          "expected": "git_add",
+          "actual": "git_add",
+          "confidence": 0.9,
+          "success": true,
+          "entities": {},
+          "timestamp": "2025-07-03T11:35:10.387Z"
+        },
+        {
+          "category": "Commit & Push",
+          "query": "Add all files to staging",
+          "expected": "git_add",
+          "actual": "git_add",
+          "confidence": 0.9,
+          "success": true,
+          "entities": {},
+          "timestamp": "2025-07-03T11:35:10.964Z"
+        },
+        {
+          "category": "Commit & Push",
+          "query": "Commit with message 'Add login functionality'",
+          "expected": "git_commit",
+          "actual": "git_commit",
+          "confidence": 0.9,
+          "success": true,
+          "entities": {
+            "message": "Add login functionality"
+          },
+          "timestamp": "2025-07-03T11:35:11.542Z"
+        },
+        {
+          "category": "Commit & Push",
+          "query": "Push my changes to GitHub",
+          "expected": "push_changes",
+          "actual": "push_changes",
+          "confidence": 0.9,
+          "success": true,
+          "entities": {},
+          "timestamp": "2025-07-03T11:35:12.902Z"
+        },
+        {
+          "category": "Commit & Push",
+          "query": "Commit and push all changes",
+          "expected": "push_changes",
+          "actual": "push_changes",
+          "confidence": 0.9,
+          "success": true,
+          "entities": {},
+          "timestamp": "2025-07-03T11:35:13.579Z"
+        }
+      ]
+    },
+    "Pull & Sync": {
+      "total": 4,
+      "successful": 4,
+      "failed": 0,
+      "successRate": "100.0%",
+      "results": [
+        {
+          "category": "Pull & Sync",
+          "query": "Pull the latest changes",
+          "expected": "pull_changes",
+          "actual": "pull_changes",
+          "confidence": 0.9,
+          "success": true,
+          "entities": {},
+          "timestamp": "2025-07-03T11:35:14.259Z"
+        },
+        {
+          "category": "Pull & Sync",
+          "query": "Sync with remote repository",
+          "expected": "pull_changes",
+          "actual": "pull_changes",
+          "confidence": 0.9,
+          "success": true,
+          "entities": {
+            "remote": "origin"
+          },
+          "timestamp": "2025-07-03T11:35:14.866Z"
+        },
+        {
+          "category": "Pull & Sync",
+          "query": "Get the newest code from GitHub",
+          "expected": "pull_changes",
+          "actual": "pull_changes",
+          "confidence": 0.9,
+          "success": true,
+          "entities": {
+            "remote": "origin"
+          },
+          "timestamp": "2025-07-03T11:35:15.449Z"
+        },
+        {
+          "category": "Pull & Sync",
+          "query": "Update my local repository",
+          "expected": "pull_changes",
+          "actual": "pull_changes",
+          "confidence": 0.9,
+          "success": true,
+          "entities": {
+            "remote": "origin"
+          },
+          "timestamp": "2025-07-03T11:35:16.029Z"
+        }
+      ]
+    },
+    "Pull Request": {
+      "total": 4,
+      "successful": 4,
+      "failed": 0,
+      "successRate": "100.0%",
+      "results": [
+        {
+          "category": "Pull Request",
+          "query": "Create a pull request",
+          "expected": "create_pr",
+          "actual": "create_pr",
+          "confidence": 0.9,
+          "success": true,
+          "entities": {},
+          "timestamp": "2025-07-03T11:35:16.726Z"
+        },
+        {
+          "category": "Pull Request",
+          "query": "Open a PR for my changes",
+          "expected": "create_pr",
+          "actual": "create_pr",
+          "confidence": 0.9,
+          "success": true,
+          "entities": {},
+          "timestamp": "2025-07-03T11:35:17.375Z"
+        },
+        {
+          "category": "Pull Request",
+          "query": "Submit a pull request",
+          "expected": "create_pr",
+          "actual": "create_pr",
+          "confidence": 0.9,
+          "success": true,
+          "entities": {},
+          "timestamp": "2025-07-03T11:35:18.023Z"
+        },
+        {
+          "category": "Pull Request",
+          "query": "Make a merge request",
+          "expected": "create_pr",
+          "actual": "create_pr",
+          "confidence": 0.9,
+          "success": true,
+          "entities": {},
+          "timestamp": "2025-07-03T11:35:19.221Z"
+        }
+      ]
+    },
+    "Repository Management": {
+      "total": 4,
+      "successful": 4,
+      "failed": 0,
+      "successRate": "100.0%",
+      "results": [
+        {
+          "category": "Repository Management",
+          "query": "Get details of my repository",
+          "expected": "list_repos",
+          "actual": "list_repos",
+          "confidence": 0.9,
+          "success": true,
+          "entities": {},
+          "timestamp": "2025-07-03T11:35:19.832Z"
+        },
+        {
+          "category": "Repository Management",
+          "query": "Show repository information",
+          "expected": "list_repos",
+          "actual": "list_repos",
+          "confidence": 0.9,
+          "success": true,
+          "entities": {},
+          "timestamp": "2025-07-03T11:35:20.456Z"
+        },
+        {
+          "category": "Repository Management",
+          "query": "Clone a repository",
+          "expected": "clone_repo",
+          "actual": "clone_repo",
+          "confidence": 0.9,
+          "success": true,
+          "entities": {},
+          "timestamp": "2025-07-03T11:35:21.163Z"
+        },
+        {
+          "category": "Repository Management",
+          "query": "Delete the test repository",
+          "expected": "unknown",
+          "actual": "unknown",
+          "confidence": 0.9,
+          "success": true,
+          "entities": {},
+          "timestamp": "2025-07-03T11:35:21.740Z"
+        }
+      ]
+    },
+    "Authentication": {
+      "total": 5,
+      "successful": 5,
+      "failed": 0,
+      "successRate": "100.0%",
+      "results": [
+        {
+          "category": "Authentication",
+          "query": "Login to GitMate",
+          "expected": "greeting",
+          "actual": "greeting",
+          "confidence": 0.9,
+          "success": true,
+          "entities": {},
+          "timestamp": "2025-07-03T11:35:22.492Z"
+        },
+        {
+          "category": "Authentication",
+          "query": "How do I authenticate?",
+          "expected": "help",
+          "actual": "help",
+          "confidence": 0.9,
+          "success": true,
+          "entities": {},
+          "timestamp": "2025-07-03T11:35:23.118Z"
+        },
+        {
+          "category": "Authentication",
+          "query": "Use my GitHub token",
+          "expected": "greeting",
+          "actual": "greeting",
+          "confidence": 0.9,
+          "success": true,
+          "entities": {},
+          "timestamp": "2025-07-03T11:35:23.725Z"
+        },
+        {
+          "category": "Authentication",
+          "query": "Am I logged in?",
+          "expected": "greeting",
+          "actual": "greeting",
+          "confidence": 0.9,
+          "success": true,
+          "entities": {},
+          "timestamp": "2025-07-03T11:35:24.331Z"
+        },
+        {
+          "category": "Authentication",
+          "query": "Logout from GitMate",
+          "expected": "greeting",
+          "actual": "greeting",
+          "confidence": 0.9,
+          "success": true,
+          "entities": {},
+          "timestamp": "2025-07-03T11:35:24.939Z"
+        }
+      ]
+    },
+    "Utility & Help": {
+      "total": 4,
+      "successful": 4,
+      "failed": 0,
+      "successRate": "100.0%",
+      "results": [
+        {
+          "category": "Utility & Help",
+          "query": "What can GitMate do?",
+          "expected": "help",
+          "actual": "help",
+          "confidence": 0.9,
+          "success": true,
+          "entities": {},
+          "timestamp": "2025-07-03T11:35:25.634Z"
+        },
+        {
+          "category": "Utility & Help",
+          "query": "Show me help",
+          "expected": "help",
+          "actual": "help",
+          "confidence": 0.9,
+          "success": true,
+          "entities": {},
+          "timestamp": "2025-07-03T11:35:26.385Z"
+        },
+        {
+          "category": "Utility & Help",
+          "query": "Generate a commit message",
+          "expected": "git_commit",
+          "actual": "git_commit",
+          "confidence": 0.9,
+          "success": true,
+          "entities": {},
+          "timestamp": "2025-07-03T11:35:26.961Z"
+        },
+        {
+          "category": "Utility & Help",
+          "query": "Initialize git here",
+          "expected": "git_init",
+          "actual": "git_init",
+          "confidence": 0.9,
+          "success": true,
+          "entities": {},
+          "timestamp": "2025-07-03T11:35:27.542Z"
+        }
+      ]
+    }
+  },
+  "problematicCategories": [
+    {
+      "name": "Git Status & Changes",
+      "successRate": "75.0%",
+      "failedTests": 1
+    }
+  ],
+  "intentFailures": {
+    "git_status → list_repos": 1
+  },
+  "allResults": [
+    {
+      "category": "Repository Listing",
+      "query": "List all my GitHub repositories",
+      "expected": "list_repos",
+      "actual": "list_repos",
+      "confidence": 0.9,
+      "success": true,
+      "entities": {},
+      "timestamp": "2025-07-03T11:35:00.909Z"
+    },
+    {
+      "category": "Repository Listing",
+      "query": "Show my repositories",
+      "expected": "list_repos",
+      "actual": "list_repos",
+      "confidence": 0.9,
+      "success": true,
+      "entities": {},
+      "timestamp": "2025-07-03T11:35:01.564Z"
+    },
+    {
+      "category": "Repository Listing",
+      "query": "What repositories do I have?",
+      "expected": "list_repos",
+      "actual": "list_repos",
+      "confidence": 0.9,
+      "success": true,
+      "entities": {},
+      "timestamp": "2025-07-03T11:35:02.225Z"
+    },
+    {
+      "category": "Repository Listing",
+      "query": "Display all my repos",
+      "expected": "list_repos",
+      "actual": "list_repos",
+      "confidence": 0.9,
+      "success": true,
+      "entities": {},
+      "timestamp": "2025-07-03T11:35:03.048Z"
+    },
+    {
+      "category": "Git Status & Changes",
+      "query": "Show me the current status",
+      "expected": "git_status",
+      "actual": "git_status",
+      "confidence": 0.9,
+      "success": true,
+      "entities": {},
+      "timestamp": "2025-07-03T11:35:04.059Z"
+    },
+    {
+      "category": "Git Status & Changes",
+      "query": "What's changed in my repository?",
+      "expected": "git_status",
+      "actual": "list_repos",
+      "confidence": 0.9,
+      "success": false,
+      "entities": {},
+      "timestamp": "2025-07-03T11:35:05.086Z"
+    },
+    {
+      "category": "Git Status & Changes",
+      "query": "Show me the differences",
+      "expected": "git_diff",
+      "actual": "git_diff",
+      "confidence": 0.9,
+      "success": true,
+      "entities": {},
+      "timestamp": "2025-07-03T11:35:05.901Z"
+    },
+    {
+      "category": "Git Status & Changes",
+      "query": "Display the git status",
+      "expected": "git_status",
+      "actual": "git_status",
+      "confidence": 0.9,
+      "success": true,
+      "entities": {},
+      "timestamp": "2025-07-03T11:35:06.611Z"
+    },
+    {
+      "category": "Branch Management",
+      "query": "List all branches",
+      "expected": "list_branches",
+      "actual": "list_branches",
+      "confidence": 0.9,
+      "success": true,
+      "entities": {},
+      "timestamp": "2025-07-03T11:35:07.293Z"
+    },
+    {
+      "category": "Branch Management",
+      "query": "Show my branches",
+      "expected": "list_branches",
+      "actual": "list_branches",
+      "confidence": 0.9,
+      "success": true,
+      "entities": {},
+      "timestamp": "2025-07-03T11:35:07.976Z"
+    },
+    {
+      "category": "Branch Management",
+      "query": "Create a new branch called feature-login",
+      "expected": "create_branch",
+      "actual": "create_branch",
+      "confidence": 0.9,
+      "success": true,
+      "entities": {
+        "branch_name": "feature-login"
+      },
+      "timestamp": "2025-07-03T11:35:08.583Z"
+    },
+    {
+      "category": "Branch Management",
+      "query": "Switch to the main branch",
+      "expected": "checkout_branch",
+      "actual": "checkout_branch",
+      "confidence": 0.9,
+      "success": true,
+      "entities": {
+        "branch_name": "main"
+      },
+      "timestamp": "2025-07-03T11:35:09.162Z"
+    },
+    {
+      "category": "Branch Management",
+      "query": "Checkout the develop branch",
+      "expected": "checkout_branch",
+      "actual": "checkout_branch",
+      "confidence": 0.9,
+      "success": true,
+      "entities": {
+        "branch_name": "develop"
+      },
+      "timestamp": "2025-07-03T11:35:09.741Z"
+    },
+    {
+      "category": "Commit & Push",
+      "query": "Stage all my changes",
+      "expected": "git_add",
+      "actual": "git_add",
+      "confidence": 0.9,
+      "success": true,
+      "entities": {},
+      "timestamp": "2025-07-03T11:35:10.387Z"
+    },
+    {
+      "category": "Commit & Push",
+      "query": "Add all files to staging",
+      "expected": "git_add",
+      "actual": "git_add",
+      "confidence": 0.9,
+      "success": true,
+      "entities": {},
+      "timestamp": "2025-07-03T11:35:10.964Z"
+    },
+    {
+      "category": "Commit & Push",
+      "query": "Commit with message 'Add login functionality'",
+      "expected": "git_commit",
+      "actual": "git_commit",
+      "confidence": 0.9,
+      "success": true,
+      "entities": {
+        "message": "Add login functionality"
+      },
+      "timestamp": "2025-07-03T11:35:11.542Z"
+    },
+    {
+      "category": "Commit & Push",
+      "query": "Push my changes to GitHub",
+      "expected": "push_changes",
+      "actual": "push_changes",
+      "confidence": 0.9,
+      "success": true,
+      "entities": {},
+      "timestamp": "2025-07-03T11:35:12.902Z"
+    },
+    {
+      "category": "Commit & Push",
+      "query": "Commit and push all changes",
+      "expected": "push_changes",
+      "actual": "push_changes",
+      "confidence": 0.9,
+      "success": true,
+      "entities": {},
+      "timestamp": "2025-07-03T11:35:13.579Z"
+    },
+    {
+      "category": "Pull & Sync",
+      "query": "Pull the latest changes",
+      "expected": "pull_changes",
+      "actual": "pull_changes",
+      "confidence": 0.9,
+      "success": true,
+      "entities": {},
+      "timestamp": "2025-07-03T11:35:14.259Z"
+    },
+    {
+      "category": "Pull & Sync",
+      "query": "Sync with remote repository",
+      "expected": "pull_changes",
+      "actual": "pull_changes",
+      "confidence": 0.9,
+      "success": true,
+      "entities": {
+        "remote": "origin"
+      },
+      "timestamp": "2025-07-03T11:35:14.866Z"
+    },
+    {
+      "category": "Pull & Sync",
+      "query": "Get the newest code from GitHub",
+      "expected": "pull_changes",
+      "actual": "pull_changes",
+      "confidence": 0.9,
+      "success": true,
+      "entities": {
+        "remote": "origin"
+      },
+      "timestamp": "2025-07-03T11:35:15.449Z"
+    },
+    {
+      "category": "Pull & Sync",
+      "query": "Update my local repository",
+      "expected": "pull_changes",
+      "actual": "pull_changes",
+      "confidence": 0.9,
+      "success": true,
+      "entities": {
+        "remote": "origin"
+      },
+      "timestamp": "2025-07-03T11:35:16.029Z"
+    },
+    {
+      "category": "Pull Request",
+      "query": "Create a pull request",
+      "expected": "create_pr",
+      "actual": "create_pr",
+      "confidence": 0.9,
+      "success": true,
+      "entities": {},
+      "timestamp": "2025-07-03T11:35:16.726Z"
+    },
+    {
+      "category": "Pull Request",
+      "query": "Open a PR for my changes",
+      "expected": "create_pr",
+      "actual": "create_pr",
+      "confidence": 0.9,
+      "success": true,
+      "entities": {},
+      "timestamp": "2025-07-03T11:35:17.375Z"
+    },
+    {
+      "category": "Pull Request",
+      "query": "Submit a pull request",
+      "expected": "create_pr",
+      "actual": "create_pr",
+      "confidence": 0.9,
+      "success": true,
+      "entities": {},
+      "timestamp": "2025-07-03T11:35:18.023Z"
+    },
+    {
+      "category": "Pull Request",
+      "query": "Make a merge request",
+      "expected": "create_pr",
+      "actual": "create_pr",
+      "confidence": 0.9,
+      "success": true,
+      "entities": {},
+      "timestamp": "2025-07-03T11:35:19.221Z"
+    },
+    {
+      "category": "Repository Management",
+      "query": "Get details of my repository",
+      "expected": "list_repos",
+      "actual": "list_repos",
+      "confidence": 0.9,
+      "success": true,
+      "entities": {},
+      "timestamp": "2025-07-03T11:35:19.832Z"
+    },
+    {
+      "category": "Repository Management",
+      "query": "Show repository information",
+      "expected": "list_repos",
+      "actual": "list_repos",
+      "confidence": 0.9,
+      "success": true,
+      "entities": {},
+      "timestamp": "2025-07-03T11:35:20.456Z"
+    },
+    {
+      "category": "Repository Management",
+      "query": "Clone a repository",
+      "expected": "clone_repo",
+      "actual": "clone_repo",
+      "confidence": 0.9,
+      "success": true,
+      "entities": {},
+      "timestamp": "2025-07-03T11:35:21.163Z"
+    },
+    {
+      "category": "Repository Management",
+      "query": "Delete the test repository",
+      "expected": "unknown",
+      "actual": "unknown",
+      "confidence": 0.9,
+      "success": true,
+      "entities": {},
+      "timestamp": "2025-07-03T11:35:21.740Z"
+    },
+    {
+      "category": "Authentication",
+      "query": "Login to GitMate",
+      "expected": "greeting",
+      "actual": "greeting",
+      "confidence": 0.9,
+      "success": true,
+      "entities": {},
+      "timestamp": "2025-07-03T11:35:22.492Z"
+    },
+    {
+      "category": "Authentication",
+      "query": "How do I authenticate?",
+      "expected": "help",
+      "actual": "help",
+      "confidence": 0.9,
+      "success": true,
+      "entities": {},
+      "timestamp": "2025-07-03T11:35:23.118Z"
+    },
+    {
+      "category": "Authentication",
+      "query": "Use my GitHub token",
+      "expected": "greeting",
+      "actual": "greeting",
+      "confidence": 0.9,
+      "success": true,
+      "entities": {},
+      "timestamp": "2025-07-03T11:35:23.725Z"
+    },
+    {
+      "category": "Authentication",
+      "query": "Am I logged in?",
+      "expected": "greeting",
+      "actual": "greeting",
+      "confidence": 0.9,
+      "success": true,
+      "entities": {},
+      "timestamp": "2025-07-03T11:35:24.331Z"
+    },
+    {
+      "category": "Authentication",
+      "query": "Logout from GitMate",
+      "expected": "greeting",
+      "actual": "greeting",
+      "confidence": 0.9,
+      "success": true,
+      "entities": {},
+      "timestamp": "2025-07-03T11:35:24.939Z"
+    },
+    {
+      "category": "Utility & Help",
+      "query": "What can GitMate do?",
+      "expected": "help",
+      "actual": "help",
+      "confidence": 0.9,
+      "success": true,
+      "entities": {},
+      "timestamp": "2025-07-03T11:35:25.634Z"
+    },
+    {
+      "category": "Utility & Help",
+      "query": "Show me help",
+      "expected": "help",
+      "actual": "help",
+      "confidence": 0.9,
+      "success": true,
+      "entities": {},
+      "timestamp": "2025-07-03T11:35:26.385Z"
+    },
+    {
+      "category": "Utility & Help",
+      "query": "Generate a commit message",
+      "expected": "git_commit",
+      "actual": "git_commit",
+      "confidence": 0.9,
+      "success": true,
+      "entities": {},
+      "timestamp": "2025-07-03T11:35:26.961Z"
+    },
+    {
+      "category": "Utility & Help",
+      "query": "Initialize git here",
+      "expected": "git_init",
+      "actual": "git_init",
+      "confidence": 0.9,
+      "success": true,
+      "entities": {},
+      "timestamp": "2025-07-03T11:35:27.542Z"
+    }
+  ]
+}

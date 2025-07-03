@@ -1,0 +1,1204 @@
+{
+  "summary": {
+    "totalWorkflows": 10,
+    "totalCommands": 42,
+    "totalSuccessful": 13,
+    "totalFailed": 29,
+    "overallSuccessRate": "31.0%",
+    "duration": "84.632s",
+    "timestamp": "2025-07-03T10:32:13.588Z"
+  },
+  "workflowSummaries": [
+    {
+      "workflowName": "Repository Creation Workflow",
+      "workflowDescription": "Create a new repository and verify it's created",
+      "totalCommands": 3,
+      "successfulCommands": 3,
+      "failedCommands": 0,
+      "successRate": "100.0%",
+      "results": [
+        {
+          "command": "Create a new repository called test-workflow-repo",
+          "expectedIntent": "create_repo",
+          "actualIntent": "create_repo",
+          "entities": {
+            "repository_name": "test-workflow-repo"
+          },
+          "confidence": 0.9,
+          "success": true,
+          "error": null,
+          "timestamp": "2025-07-03T10:30:52.003Z"
+        },
+        {
+          "command": "Make a repo named my-test-project",
+          "expectedIntent": "create_repo",
+          "actualIntent": "create_repo",
+          "entities": {
+            "repo_name": "my-test-project"
+          },
+          "confidence": 0.9,
+          "success": true,
+          "error": null,
+          "timestamp": "2025-07-03T10:30:54.926Z"
+        },
+        {
+          "command": "Initialize a fresh GitHub repo titled workflow-demo",
+          "expectedIntent": "create_repo",
+          "actualIntent": "create_repo",
+          "entities": {
+            "repo_name": "workflow-demo"
+          },
+          "confidence": 0.9,
+          "success": true,
+          "error": null,
+          "timestamp": "2025-07-03T10:30:58.269Z"
+        }
+      ]
+    },
+    {
+      "workflowName": "Repository Listing & Discovery",
+      "workflowDescription": "List and discover repositories",
+      "totalCommands": 4,
+      "successfulCommands": 0,
+      "failedCommands": 4,
+      "successRate": "0.0%",
+      "results": [
+        {
+          "command": "List all my GitHub repositories",
+          "expectedIntent": "list_repos",
+          "actualIntent": "create_repo",
+          "entities": {
+            "repository_name": "my-awesome-project"
+          },
+          "confidence": 0.9,
+          "success": false,
+          "error": null,
+          "timestamp": "2025-07-03T10:30:59.423Z"
+        },
+        {
+          "command": "Show my repositories",
+          "expectedIntent": "list_repos",
+          "actualIntent": "create_repo",
+          "entities": {
+            "repository_name": "my-awesome-project"
+          },
+          "confidence": 0.9,
+          "success": false,
+          "error": null,
+          "timestamp": "2025-07-03T10:31:00.591Z"
+        },
+        {
+          "command": "What repositories do I have?",
+          "expectedIntent": "list_repos",
+          "actualIntent": "create_repo",
+          "entities": {
+            "repository_name": "my-awesome-project"
+          },
+          "confidence": 0.9,
+          "success": false,
+          "error": null,
+          "timestamp": "2025-07-03T10:31:01.741Z"
+        },
+        {
+          "command": "Display all my repos",
+          "expectedIntent": "list_repos",
+          "actualIntent": "create_repo",
+          "entities": {
+            "repository_name": "my-awesome-project"
+          },
+          "confidence": 0.9,
+          "success": false,
+          "error": null,
+          "timestamp": "2025-07-03T10:31:02.893Z"
+        }
+      ]
+    },
+    {
+      "workflowName": "Git Status & Changes Workflow",
+      "workflowDescription": "Check status and view changes",
+      "totalCommands": 4,
+      "successfulCommands": 0,
+      "failedCommands": 4,
+      "successRate": "0.0%",
+      "results": [
+        {
+          "command": "Show me the current status",
+          "expectedIntent": "git_status",
+          "actualIntent": "unknown",
+          "entities": {
+            "error": "Mistral Proxy error: 500 {\"error\":\"All Mistral providers are currently unavailable. Please try again later.\"}"
+          },
+          "success": false,
+          "error": null,
+          "timestamp": "2025-07-03T10:31:04.744Z"
+        },
+        {
+          "command": "What's changed in my repository?",
+          "expectedIntent": "git_status",
+          "actualIntent": "create_repo",
+          "entities": {
+            "repository_name": "my-awesome-project"
+          },
+          "confidence": 0.9,
+          "success": false,
+          "error": null,
+          "timestamp": "2025-07-03T10:31:05.893Z"
+        },
+        {
+          "command": "Show me the differences",
+          "expectedIntent": "git_diff",
+          "actualIntent": "create_repo",
+          "entities": {
+            "repository_name": "my-awesome-project"
+          },
+          "confidence": 0.9,
+          "success": false,
+          "error": null,
+          "timestamp": "2025-07-03T10:31:07.046Z"
+        },
+        {
+          "command": "Display the git status",
+          "expectedIntent": "git_status",
+          "actualIntent": "create_repo",
+          "entities": {
+            "repository_name": "my-awesome-project"
+          },
+          "confidence": 0.9,
+          "success": false,
+          "error": null,
+          "timestamp": "2025-07-03T10:31:08.196Z"
+        }
+      ]
+    },
+    {
+      "workflowName": "Branch Management Workflow",
+      "workflowDescription": "Create, list, and switch branches",
+      "totalCommands": 5,
+      "successfulCommands": 3,
+      "failedCommands": 2,
+      "successRate": "60.0%",
+      "results": [
+        {
+          "command": "List all branches",
+          "expectedIntent": "list_branches",
+          "actualIntent": "create_repo",
+          "entities": {
+            "repository_name": "my-awesome-project"
+          },
+          "confidence": 0.9,
+          "success": false,
+          "error": null,
+          "timestamp": "2025-07-03T10:31:09.346Z"
+        },
+        {
+          "command": "Show my branches",
+          "expectedIntent": "list_branches",
+          "actualIntent": "create_repo",
+          "entities": {
+            "repository_name": "my-awesome-project"
+          },
+          "confidence": 0.9,
+          "success": false,
+          "error": null,
+          "timestamp": "2025-07-03T10:31:10.497Z"
+        },
+        {
+          "command": "Create a new branch called feature-login",
+          "expectedIntent": "create_branch",
+          "actualIntent": "create_branch",
+          "entities": {
+            "branch_name": "feature-login"
+          },
+          "confidence": 0.9,
+          "success": true,
+          "error": null,
+          "timestamp": "2025-07-03T10:31:14.103Z"
+        },
+        {
+          "command": "Switch to the main branch",
+          "expectedIntent": "checkout_branch",
+          "actualIntent": "checkout_branch",
+          "entities": {
+            "branch_name": "main"
+          },
+          "confidence": 0.9,
+          "success": true,
+          "error": null,
+          "timestamp": "2025-07-03T10:31:15.251Z"
+        },
+        {
+          "command": "Checkout the develop branch",
+          "expectedIntent": "checkout_branch",
+          "actualIntent": "checkout_branch",
+          "entities": {
+            "branch_name": "develop"
+          },
+          "confidence": 0.9,
+          "success": true,
+          "error": null,
+          "timestamp": "2025-07-03T10:31:18.465Z"
+        }
+      ]
+    },
+    {
+      "workflowName": "Commit & Push Workflow",
+      "workflowDescription": "Stage, commit, and push changes",
+      "totalCommands": 5,
+      "successfulCommands": 2,
+      "failedCommands": 3,
+      "successRate": "40.0%",
+      "results": [
+        {
+          "command": "Stage all my changes",
+          "expectedIntent": "git_add",
+          "actualIntent": "push_changes",
+          "entities": {
+            "branch": "current",
+            "remote": "origin"
+          },
+          "confidence": 0.9,
+          "success": false,
+          "error": null,
+          "timestamp": "2025-07-03T10:31:19.616Z"
+        },
+        {
+          "command": "Add all files to staging",
+          "expectedIntent": "git_add",
+          "actualIntent": "git_add",
+          "entities": {},
+          "confidence": 0.9,
+          "success": true,
+          "error": null,
+          "timestamp": "2025-07-03T10:31:22.722Z"
+        },
+        {
+          "command": "Commit with message 'Add login functionality'",
+          "expectedIntent": "git_commit",
+          "actualIntent": "git_commit",
+          "entities": {
+            "message": "Add login functionality"
+          },
+          "confidence": 0.9,
+          "success": true,
+          "error": null,
+          "timestamp": "2025-07-03T10:31:26.254Z"
+        },
+        {
+          "command": "Push my changes to GitHub",
+          "expectedIntent": "push_changes",
+          "actualIntent": "create_repo",
+          "entities": {
+            "repository_name": "my-awesome-project"
+          },
+          "confidence": 0.9,
+          "success": false,
+          "error": null,
+          "timestamp": "2025-07-03T10:31:27.402Z"
+        },
+        {
+          "command": "Commit and push all changes",
+          "expectedIntent": "push_changes",
+          "actualIntent": "create_repo",
+          "entities": {
+            "repository_name": "my-awesome-project"
+          },
+          "confidence": 0.9,
+          "success": false,
+          "error": null,
+          "timestamp": "2025-07-03T10:31:28.574Z"
+        }
+      ]
+    },
+    {
+      "workflowName": "Pull & Sync Workflow",
+      "workflowDescription": "Pull latest changes and sync",
+      "totalCommands": 4,
+      "successfulCommands": 2,
+      "failedCommands": 2,
+      "successRate": "50.0%",
+      "results": [
+        {
+          "command": "Pull the latest changes",
+          "expectedIntent": "pull_changes",
+          "actualIntent": "push_changes",
+          "entities": {
+            "branch": "current",
+            "remote": "origin"
+          },
+          "confidence": 0.9,
+          "success": false,
+          "error": null,
+          "timestamp": "2025-07-03T10:31:29.723Z"
+        },
+        {
+          "command": "Sync with remote repository",
+          "expectedIntent": "pull_changes",
+          "actualIntent": "pull_changes",
+          "entities": {
+            "remote": "origin"
+          },
+          "confidence": 0.9,
+          "success": true,
+          "error": null,
+          "timestamp": "2025-07-03T10:31:40.370Z"
+        },
+        {
+          "command": "Get the newest code from GitHub",
+          "expectedIntent": "pull_changes",
+          "actualIntent": "unknown",
+          "entities": {
+            "error": "Mistral Proxy error: 500 {\"error\":\"All Mistral providers are currently unavailable. Please try again later.\"}"
+          },
+          "success": false,
+          "error": null,
+          "timestamp": "2025-07-03T10:31:42.250Z"
+        },
+        {
+          "command": "Update my local repository",
+          "expectedIntent": "pull_changes",
+          "actualIntent": "pull_changes",
+          "entities": {
+            "remote": "origin"
+          },
+          "confidence": 0.9,
+          "success": true,
+          "error": null,
+          "timestamp": "2025-07-03T10:31:44.390Z"
+        }
+      ]
+    },
+    {
+      "workflowName": "Pull Request Workflow",
+      "workflowDescription": "Create and manage pull requests",
+      "totalCommands": 4,
+      "successfulCommands": 0,
+      "failedCommands": 4,
+      "successRate": "0.0%",
+      "results": [
+        {
+          "command": "Create a pull request",
+          "expectedIntent": "create_pr",
+          "actualIntent": "create_repo",
+          "entities": {
+            "repository_name": "my-awesome-project"
+          },
+          "confidence": 0.9,
+          "success": false,
+          "error": null,
+          "timestamp": "2025-07-03T10:31:45.540Z"
+        },
+        {
+          "command": "Open a PR for my changes",
+          "expectedIntent": "create_pr",
+          "actualIntent": "create_repo",
+          "entities": {
+            "repository_name": "my-awesome-project"
+          },
+          "confidence": 0.9,
+          "success": false,
+          "error": null,
+          "timestamp": "2025-07-03T10:31:46.690Z"
+        },
+        {
+          "command": "Submit a pull request",
+          "expectedIntent": "create_pr",
+          "actualIntent": "create_repo",
+          "entities": {
+            "repository_name": "my-awesome-project"
+          },
+          "confidence": 0.9,
+          "success": false,
+          "error": null,
+          "timestamp": "2025-07-03T10:31:47.839Z"
+        },
+        {
+          "command": "Make a merge request",
+          "expectedIntent": "create_pr",
+          "actualIntent": "create_repo",
+          "entities": {
+            "repository_name": "my-awesome-project"
+          },
+          "confidence": 0.9,
+          "success": false,
+          "error": null,
+          "timestamp": "2025-07-03T10:31:48.990Z"
+        }
+      ]
+    },
+    {
+      "workflowName": "Repository Management Workflow",
+      "workflowDescription": "Manage repository settings and details",
+      "totalCommands": 4,
+      "successfulCommands": 0,
+      "failedCommands": 4,
+      "successRate": "0.0%",
+      "results": [
+        {
+          "command": "Get details of my repository",
+          "expectedIntent": "list_repos",
+          "actualIntent": "unknown",
+          "entities": {},
+          "confidence": 0.9,
+          "success": false,
+          "error": null,
+          "timestamp": "2025-07-03T10:31:50.140Z"
+        },
+        {
+          "command": "Show repository information",
+          "expectedIntent": "list_repos",
+          "actualIntent": "unknown",
+          "entities": {
+            "error": "Mistral Proxy error: 500 {\"error\":\"All Mistral providers are currently unavailable. Please try again later.\"}"
+          },
+          "success": false,
+          "error": null,
+          "timestamp": "2025-07-03T10:31:52.097Z"
+        },
+        {
+          "command": "Clone a repository",
+          "expectedIntent": "clone_repo",
+          "actualIntent": "create_repo",
+          "entities": {
+            "repository_name": "my-awesome-project"
+          },
+          "confidence": 0.9,
+          "success": false,
+          "error": null,
+          "timestamp": "2025-07-03T10:31:53.246Z"
+        },
+        {
+          "command": "Delete the test repository",
+          "expectedIntent": "unknown",
+          "actualIntent": "create_repo",
+          "entities": {
+            "repository_name": "test-app"
+          },
+          "confidence": 0.9,
+          "success": false,
+          "error": null,
+          "timestamp": "2025-07-03T10:31:54.393Z"
+        }
+      ]
+    },
+    {
+      "workflowName": "Authentication Workflow",
+      "workflowDescription": "Handle authentication and login",
+      "totalCommands": 5,
+      "successfulCommands": 1,
+      "failedCommands": 4,
+      "successRate": "20.0%",
+      "results": [
+        {
+          "command": "Login to GitMate",
+          "expectedIntent": "greeting",
+          "actualIntent": "unknown",
+          "entities": {},
+          "confidence": 0.9,
+          "success": false,
+          "error": null,
+          "timestamp": "2025-07-03T10:31:55.472Z"
+        },
+        {
+          "command": "How do I authenticate?",
+          "expectedIntent": "help",
+          "actualIntent": "help",
+          "entities": {},
+          "confidence": 0.9,
+          "success": true,
+          "error": null,
+          "timestamp": "2025-07-03T10:31:57.849Z"
+        },
+        {
+          "command": "Use my GitHub token",
+          "expectedIntent": "greeting",
+          "actualIntent": "unknown",
+          "entities": {},
+          "confidence": 0.9,
+          "success": false,
+          "error": null,
+          "timestamp": "2025-07-03T10:31:59.003Z"
+        },
+        {
+          "command": "Am I logged in?",
+          "expectedIntent": "greeting",
+          "actualIntent": "unknown",
+          "entities": {
+            "error": "Mistral Proxy error: 500 {\"error\":\"All Mistral providers are currently unavailable. Please try again later.\"}"
+          },
+          "success": false,
+          "error": null,
+          "timestamp": "2025-07-03T10:32:00.890Z"
+        },
+        {
+          "command": "Logout from GitMate",
+          "expectedIntent": "greeting",
+          "actualIntent": "unrelated",
+          "entities": {},
+          "confidence": 0.9,
+          "success": false,
+          "error": null,
+          "timestamp": "2025-07-03T10:32:06.576Z"
+        }
+      ]
+    },
+    {
+      "workflowName": "Utility & Help Workflow",
+      "workflowDescription": "Get help and utility functions",
+      "totalCommands": 4,
+      "successfulCommands": 2,
+      "failedCommands": 2,
+      "successRate": "50.0%",
+      "results": [
+        {
+          "command": "What can GitMate do?",
+          "expectedIntent": "help",
+          "actualIntent": "create_repo",
+          "entities": {
+            "repository_name": "my-awesome-project"
+          },
+          "confidence": 0.9,
+          "success": false,
+          "error": null,
+          "timestamp": "2025-07-03T10:32:07.726Z"
+        },
+        {
+          "command": "Show me help",
+          "expectedIntent": "help",
+          "actualIntent": "create_repo",
+          "entities": {
+            "repository_name": "my-awesome-project"
+          },
+          "confidence": 0.9,
+          "success": false,
+          "error": null,
+          "timestamp": "2025-07-03T10:32:08.893Z"
+        },
+        {
+          "command": "Generate a commit message",
+          "expectedIntent": "git_commit",
+          "actualIntent": "git_commit",
+          "entities": {},
+          "confidence": 0.9,
+          "success": true,
+          "error": null,
+          "timestamp": "2025-07-03T10:32:10.041Z"
+        },
+        {
+          "command": "Initialize git here",
+          "expectedIntent": "git_init",
+          "actualIntent": "git_init",
+          "entities": {},
+          "confidence": 0.9,
+          "success": true,
+          "error": null,
+          "timestamp": "2025-07-03T10:32:12.586Z"
+        }
+      ]
+    }
+  ],
+  "intentAccuracy": {
+    "Repository Creation Workflow": {
+      "correct": 3,
+      "total": 3,
+      "accuracy": "100.0%"
+    },
+    "Repository Listing & Discovery": {
+      "correct": 0,
+      "total": 4,
+      "accuracy": "0.0%"
+    },
+    "Git Status & Changes Workflow": {
+      "correct": 0,
+      "total": 4,
+      "accuracy": "0.0%"
+    },
+    "Branch Management Workflow": {
+      "correct": 3,
+      "total": 5,
+      "accuracy": "60.0%"
+    },
+    "Commit & Push Workflow": {
+      "correct": 2,
+      "total": 5,
+      "accuracy": "40.0%"
+    },
+    "Pull & Sync Workflow": {
+      "correct": 2,
+      "total": 4,
+      "accuracy": "50.0%"
+    },
+    "Pull Request Workflow": {
+      "correct": 0,
+      "total": 4,
+      "accuracy": "0.0%"
+    },
+    "Repository Management Workflow": {
+      "correct": 0,
+      "total": 4,
+      "accuracy": "0.0%"
+    },
+    "Authentication Workflow": {
+      "correct": 1,
+      "total": 5,
+      "accuracy": "20.0%"
+    },
+    "Utility & Help Workflow": {
+      "correct": 2,
+      "total": 4,
+      "accuracy": "50.0%"
+    }
+  },
+  "problematicWorkflows": [
+    {
+      "name": "Repository Listing & Discovery",
+      "successRate": "0.0%",
+      "failedCommands": 4
+    },
+    {
+      "name": "Git Status & Changes Workflow",
+      "successRate": "0.0%",
+      "failedCommands": 4
+    },
+    {
+      "name": "Pull Request Workflow",
+      "successRate": "0.0%",
+      "failedCommands": 4
+    },
+    {
+      "name": "Repository Management Workflow",
+      "successRate": "0.0%",
+      "failedCommands": 4
+    },
+    {
+      "name": "Authentication Workflow",
+      "successRate": "20.0%",
+      "failedCommands": 4
+    },
+    {
+      "name": "Commit & Push Workflow",
+      "successRate": "40.0%",
+      "failedCommands": 3
+    },
+    {
+      "name": "Pull & Sync Workflow",
+      "successRate": "50.0%",
+      "failedCommands": 2
+    },
+    {
+      "name": "Utility & Help Workflow",
+      "successRate": "50.0%",
+      "failedCommands": 2
+    },
+    {
+      "name": "Branch Management Workflow",
+      "successRate": "60.0%",
+      "failedCommands": 2
+    }
+  ],
+  "intentFailures": {
+    "list_repos → create_repo": 4,
+    "git_status → unknown": 1,
+    "git_status → create_repo": 2,
+    "git_diff → create_repo": 1,
+    "list_branches → create_repo": 2,
+    "git_add → push_changes": 1,
+    "push_changes → create_repo": 2,
+    "pull_changes → push_changes": 1,
+    "pull_changes → unknown": 1,
+    "create_pr → create_repo": 4,
+    "list_repos → unknown": 2,
+    "clone_repo → create_repo": 1,
+    "unknown → create_repo": 1,
+    "greeting → unknown": 3,
+    "greeting → unrelated": 1,
+    "help → create_repo": 2
+  },
+  "allResults": [
+    {
+      "command": "Create a new repository called test-workflow-repo",
+      "expectedIntent": "create_repo",
+      "actualIntent": "create_repo",
+      "entities": {
+        "repository_name": "test-workflow-repo"
+      },
+      "confidence": 0.9,
+      "success": true,
+      "error": null,
+      "timestamp": "2025-07-03T10:30:52.003Z"
+    },
+    {
+      "command": "Make a repo named my-test-project",
+      "expectedIntent": "create_repo",
+      "actualIntent": "create_repo",
+      "entities": {
+        "repo_name": "my-test-project"
+      },
+      "confidence": 0.9,
+      "success": true,
+      "error": null,
+      "timestamp": "2025-07-03T10:30:54.926Z"
+    },
+    {
+      "command": "Initialize a fresh GitHub repo titled workflow-demo",
+      "expectedIntent": "create_repo",
+      "actualIntent": "create_repo",
+      "entities": {
+        "repo_name": "workflow-demo"
+      },
+      "confidence": 0.9,
+      "success": true,
+      "error": null,
+      "timestamp": "2025-07-03T10:30:58.269Z"
+    },
+    {
+      "command": "List all my GitHub repositories",
+      "expectedIntent": "list_repos",
+      "actualIntent": "create_repo",
+      "entities": {
+        "repository_name": "my-awesome-project"
+      },
+      "confidence": 0.9,
+      "success": false,
+      "error": null,
+      "timestamp": "2025-07-03T10:30:59.423Z"
+    },
+    {
+      "command": "Show my repositories",
+      "expectedIntent": "list_repos",
+      "actualIntent": "create_repo",
+      "entities": {
+        "repository_name": "my-awesome-project"
+      },
+      "confidence": 0.9,
+      "success": false,
+      "error": null,
+      "timestamp": "2025-07-03T10:31:00.591Z"
+    },
+    {
+      "command": "What repositories do I have?",
+      "expectedIntent": "list_repos",
+      "actualIntent": "create_repo",
+      "entities": {
+        "repository_name": "my-awesome-project"
+      },
+      "confidence": 0.9,
+      "success": false,
+      "error": null,
+      "timestamp": "2025-07-03T10:31:01.741Z"
+    },
+    {
+      "command": "Display all my repos",
+      "expectedIntent": "list_repos",
+      "actualIntent": "create_repo",
+      "entities": {
+        "repository_name": "my-awesome-project"
+      },
+      "confidence": 0.9,
+      "success": false,
+      "error": null,
+      "timestamp": "2025-07-03T10:31:02.893Z"
+    },
+    {
+      "command": "Show me the current status",
+      "expectedIntent": "git_status",
+      "actualIntent": "unknown",
+      "entities": {
+        "error": "Mistral Proxy error: 500 {\"error\":\"All Mistral providers are currently unavailable. Please try again later.\"}"
+      },
+      "success": false,
+      "error": null,
+      "timestamp": "2025-07-03T10:31:04.744Z"
+    },
+    {
+      "command": "What's changed in my repository?",
+      "expectedIntent": "git_status",
+      "actualIntent": "create_repo",
+      "entities": {
+        "repository_name": "my-awesome-project"
+      },
+      "confidence": 0.9,
+      "success": false,
+      "error": null,
+      "timestamp": "2025-07-03T10:31:05.893Z"
+    },
+    {
+      "command": "Show me the differences",
+      "expectedIntent": "git_diff",
+      "actualIntent": "create_repo",
+      "entities": {
+        "repository_name": "my-awesome-project"
+      },
+      "confidence": 0.9,
+      "success": false,
+      "error": null,
+      "timestamp": "2025-07-03T10:31:07.046Z"
+    },
+    {
+      "command": "Display the git status",
+      "expectedIntent": "git_status",
+      "actualIntent": "create_repo",
+      "entities": {
+        "repository_name": "my-awesome-project"
+      },
+      "confidence": 0.9,
+      "success": false,
+      "error": null,
+      "timestamp": "2025-07-03T10:31:08.196Z"
+    },
+    {
+      "command": "List all branches",
+      "expectedIntent": "list_branches",
+      "actualIntent": "create_repo",
+      "entities": {
+        "repository_name": "my-awesome-project"
+      },
+      "confidence": 0.9,
+      "success": false,
+      "error": null,
+      "timestamp": "2025-07-03T10:31:09.346Z"
+    },
+    {
+      "command": "Show my branches",
+      "expectedIntent": "list_branches",
+      "actualIntent": "create_repo",
+      "entities": {
+        "repository_name": "my-awesome-project"
+      },
+      "confidence": 0.9,
+      "success": false,
+      "error": null,
+      "timestamp": "2025-07-03T10:31:10.497Z"
+    },
+    {
+      "command": "Create a new branch called feature-login",
+      "expectedIntent": "create_branch",
+      "actualIntent": "create_branch",
+      "entities": {
+        "branch_name": "feature-login"
+      },
+      "confidence": 0.9,
+      "success": true,
+      "error": null,
+      "timestamp": "2025-07-03T10:31:14.103Z"
+    },
+    {
+      "command": "Switch to the main branch",
+      "expectedIntent": "checkout_branch",
+      "actualIntent": "checkout_branch",
+      "entities": {
+        "branch_name": "main"
+      },
+      "confidence": 0.9,
+      "success": true,
+      "error": null,
+      "timestamp": "2025-07-03T10:31:15.251Z"
+    },
+    {
+      "command": "Checkout the develop branch",
+      "expectedIntent": "checkout_branch",
+      "actualIntent": "checkout_branch",
+      "entities": {
+        "branch_name": "develop"
+      },
+      "confidence": 0.9,
+      "success": true,
+      "error": null,
+      "timestamp": "2025-07-03T10:31:18.465Z"
+    },
+    {
+      "command": "Stage all my changes",
+      "expectedIntent": "git_add",
+      "actualIntent": "push_changes",
+      "entities": {
+        "branch": "current",
+        "remote": "origin"
+      },
+      "confidence": 0.9,
+      "success": false,
+      "error": null,
+      "timestamp": "2025-07-03T10:31:19.616Z"
+    },
+    {
+      "command": "Add all files to staging",
+      "expectedIntent": "git_add",
+      "actualIntent": "git_add",
+      "entities": {},
+      "confidence": 0.9,
+      "success": true,
+      "error": null,
+      "timestamp": "2025-07-03T10:31:22.722Z"
+    },
+    {
+      "command": "Commit with message 'Add login functionality'",
+      "expectedIntent": "git_commit",
+      "actualIntent": "git_commit",
+      "entities": {
+        "message": "Add login functionality"
+      },
+      "confidence": 0.9,
+      "success": true,
+      "error": null,
+      "timestamp": "2025-07-03T10:31:26.254Z"
+    },
+    {
+      "command": "Push my changes to GitHub",
+      "expectedIntent": "push_changes",
+      "actualIntent": "create_repo",
+      "entities": {
+        "repository_name": "my-awesome-project"
+      },
+      "confidence": 0.9,
+      "success": false,
+      "error": null,
+      "timestamp": "2025-07-03T10:31:27.402Z"
+    },
+    {
+      "command": "Commit and push all changes",
+      "expectedIntent": "push_changes",
+      "actualIntent": "create_repo",
+      "entities": {
+        "repository_name": "my-awesome-project"
+      },
+      "confidence": 0.9,
+      "success": false,
+      "error": null,
+      "timestamp": "2025-07-03T10:31:28.574Z"
+    },
+    {
+      "command": "Pull the latest changes",
+      "expectedIntent": "pull_changes",
+      "actualIntent": "push_changes",
+      "entities": {
+        "branch": "current",
+        "remote": "origin"
+      },
+      "confidence": 0.9,
+      "success": false,
+      "error": null,
+      "timestamp": "2025-07-03T10:31:29.723Z"
+    },
+    {
+      "command": "Sync with remote repository",
+      "expectedIntent": "pull_changes",
+      "actualIntent": "pull_changes",
+      "entities": {
+        "remote": "origin"
+      },
+      "confidence": 0.9,
+      "success": true,
+      "error": null,
+      "timestamp": "2025-07-03T10:31:40.370Z"
+    },
+    {
+      "command": "Get the newest code from GitHub",
+      "expectedIntent": "pull_changes",
+      "actualIntent": "unknown",
+      "entities": {
+        "error": "Mistral Proxy error: 500 {\"error\":\"All Mistral providers are currently unavailable. Please try again later.\"}"
+      },
+      "success": false,
+      "error": null,
+      "timestamp": "2025-07-03T10:31:42.250Z"
+    },
+    {
+      "command": "Update my local repository",
+      "expectedIntent": "pull_changes",
+      "actualIntent": "pull_changes",
+      "entities": {
+        "remote": "origin"
+      },
+      "confidence": 0.9,
+      "success": true,
+      "error": null,
+      "timestamp": "2025-07-03T10:31:44.390Z"
+    },
+    {
+      "command": "Create a pull request",
+      "expectedIntent": "create_pr",
+      "actualIntent": "create_repo",
+      "entities": {
+        "repository_name": "my-awesome-project"
+      },
+      "confidence": 0.9,
+      "success": false,
+      "error": null,
+      "timestamp": "2025-07-03T10:31:45.540Z"
+    },
+    {
+      "command": "Open a PR for my changes",
+      "expectedIntent": "create_pr",
+      "actualIntent": "create_repo",
+      "entities": {
+        "repository_name": "my-awesome-project"
+      },
+      "confidence": 0.9,
+      "success": false,
+      "error": null,
+      "timestamp": "2025-07-03T10:31:46.690Z"
+    },
+    {
+      "command": "Submit a pull request",
+      "expectedIntent": "create_pr",
+      "actualIntent": "create_repo",
+      "entities": {
+        "repository_name": "my-awesome-project"
+      },
+      "confidence": 0.9,
+      "success": false,
+      "error": null,
+      "timestamp": "2025-07-03T10:31:47.839Z"
+    },
+    {
+      "command": "Make a merge request",
+      "expectedIntent": "create_pr",
+      "actualIntent": "create_repo",
+      "entities": {
+        "repository_name": "my-awesome-project"
+      },
+      "confidence": 0.9,
+      "success": false,
+      "error": null,
+      "timestamp": "2025-07-03T10:31:48.990Z"
+    },
+    {
+      "command": "Get details of my repository",
+      "expectedIntent": "list_repos",
+      "actualIntent": "unknown",
+      "entities": {},
+      "confidence": 0.9,
+      "success": false,
+      "error": null,
+      "timestamp": "2025-07-03T10:31:50.140Z"
+    },
+    {
+      "command": "Show repository information",
+      "expectedIntent": "list_repos",
+      "actualIntent": "unknown",
+      "entities": {
+        "error": "Mistral Proxy error: 500 {\"error\":\"All Mistral providers are currently unavailable. Please try again later.\"}"
+      },
+      "success": false,
+      "error": null,
+      "timestamp": "2025-07-03T10:31:52.097Z"
+    },
+    {
+      "command": "Clone a repository",
+      "expectedIntent": "clone_repo",
+      "actualIntent": "create_repo",
+      "entities": {
+        "repository_name": "my-awesome-project"
+      },
+      "confidence": 0.9,
+      "success": false,
+      "error": null,
+      "timestamp": "2025-07-03T10:31:53.246Z"
+    },
+    {
+      "command": "Delete the test repository",
+      "expectedIntent": "unknown",
+      "actualIntent": "create_repo",
+      "entities": {
+        "repository_name": "test-app"
+      },
+      "confidence": 0.9,
+      "success": false,
+      "error": null,
+      "timestamp": "2025-07-03T10:31:54.393Z"
+    },
+    {
+      "command": "Login to GitMate",
+      "expectedIntent": "greeting",
+      "actualIntent": "unknown",
+      "entities": {},
+      "confidence": 0.9,
+      "success": false,
+      "error": null,
+      "timestamp": "2025-07-03T10:31:55.472Z"
+    },
+    {
+      "command": "How do I authenticate?",
+      "expectedIntent": "help",
+      "actualIntent": "help",
+      "entities": {},
+      "confidence": 0.9,
+      "success": true,
+      "error": null,
+      "timestamp": "2025-07-03T10:31:57.849Z"
+    },
+    {
+      "command": "Use my GitHub token",
+      "expectedIntent": "greeting",
+      "actualIntent": "unknown",
+      "entities": {},
+      "confidence": 0.9,
+      "success": false,
+      "error": null,
+      "timestamp": "2025-07-03T10:31:59.003Z"
+    },
+    {
+      "command": "Am I logged in?",
+      "expectedIntent": "greeting",
+      "actualIntent": "unknown",
+      "entities": {
+        "error": "Mistral Proxy error: 500 {\"error\":\"All Mistral providers are currently unavailable. Please try again later.\"}"
+      },
+      "success": false,
+      "error": null,
+      "timestamp": "2025-07-03T10:32:00.890Z"
+    },
+    {
+      "command": "Logout from GitMate",
+      "expectedIntent": "greeting",
+      "actualIntent": "unrelated",
+      "entities": {},
+      "confidence": 0.9,
+      "success": false,
+      "error": null,
+      "timestamp": "2025-07-03T10:32:06.576Z"
+    },
+    {
+      "command": "What can GitMate do?",
+      "expectedIntent": "help",
+      "actualIntent": "create_repo",
+      "entities": {
+        "repository_name": "my-awesome-project"
+      },
+      "confidence": 0.9,
+      "success": false,
+      "error": null,
+      "timestamp": "2025-07-03T10:32:07.726Z"
+    },
+    {
+      "command": "Show me help",
+      "expectedIntent": "help",
+      "actualIntent": "create_repo",
+      "entities": {
+        "repository_name": "my-awesome-project"
+      },
+      "confidence": 0.9,
+      "success": false,
+      "error": null,
+      "timestamp": "2025-07-03T10:32:08.893Z"
+    },
+    {
+      "command": "Generate a commit message",
+      "expectedIntent": "git_commit",
+      "actualIntent": "git_commit",
+      "entities": {},
+      "confidence": 0.9,
+      "success": true,
+      "error": null,
+      "timestamp": "2025-07-03T10:32:10.041Z"
+    },
+    {
+      "command": "Initialize git here",
+      "expectedIntent": "git_init",
+      "actualIntent": "git_init",
+      "entities": {},
+      "confidence": 0.9,
+      "success": true,
+      "error": null,
+      "timestamp": "2025-07-03T10:32:12.586Z"
+    }
+  ]
+}

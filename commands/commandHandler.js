@@ -289,10 +289,243 @@ export async function handleGitCommand(args, currentWorkingDirectory = '.') {
         console.error(`Error pulling changes: ${error.message}`);
       }
       break;
+    case 'clone':
+      try {
+        await handleInteractiveClone(options);
+      } catch (error) {
+        console.error(`Error cloning repository: ${error.message}`);
+      }
+      break;
+    case 'checkout':
+      try {
+        const branchName = options[0];
+        if (!branchName) {
+          console.error("Error: Branch name is required. Usage: git checkout <branch-name>");
+          return;
+        }
+        const result = await gitService.checkoutBranch(branchName, currentWorkingDirectory);
+        console.log(result);
+      } catch (error) {
+        console.error(`Error checking out branch: ${error.message}`);
+      }
+      break;
+    case 'merge':
+      try {
+        const sourceBranch = options[0];
+        if (!sourceBranch) {
+          console.error("Error: Source branch is required. Usage: git merge <source-branch>");
+          return;
+        }
+        const result = await gitService.mergeBranch(sourceBranch, currentWorkingDirectory);
+        console.log(result);
+      } catch (error) {
+        console.error(`Error merging branch: ${error.message}`);
+      }
+      break;
+    case 'rebase':
+      try {
+        const baseBranch = options[0];
+        if (!baseBranch) {
+          console.error("Error: Base branch is required. Usage: git rebase <base-branch>");
+          return;
+        }
+        const result = await gitService.rebaseBranch(baseBranch, currentWorkingDirectory);
+        console.log(result);
+      } catch (error) {
+        console.error(`Error rebasing branch: ${error.message}`);
+      }
+      break;
+    case 'revert':
+      try {
+        const commitHash = options[0] || 'HEAD';
+        const result = await gitService.revertCommit(commitHash, currentWorkingDirectory);
+        console.log(result);
+      } catch (error) {
+        console.error(`Error reverting commit: ${error.message}`);
+      }
+      break;
     // Add more git subcommands: push, pull, branch, checkout, merge, rebase etc.
     default:
       logger.warn(`Unknown 'git' subcommand: ${subCommand}`, { service: serviceName });
-      console.log(`Unknown 'git' subcommand: ${subCommand}. Supported: init, status, add, commit, branch, remote, log, diff, push, pull (more to come).`);
+      console.log(`Unknown 'git' subcommand: ${subCommand}. Supported: init, status, add, commit, branch, remote, log, diff, push, pull, clone, checkout, merge, rebase, revert (more to come).`);
+  }
+}
+
+async function handleInteractiveClone(options) {
+  try {
+    // Check if URL is provided directly
+    const repoUrl = options[0];
+    if (repoUrl) {
+      const targetDirectory = options[1];
+      const result = await gitService.cloneRepository(repoUrl, { directory: targetDirectory });
+      console.log(result);
+      return;
+    }
+
+    // Interactive flow
+    console.log(chalk.blue('\n🔗 Repository Cloning Options'));
+    
+    const { cloneType } = await inquirer.prompt([
+      {
+        type: 'list',
+        name: 'cloneType',
+        message: 'What would you like to clone?',
+        choices: [
+          { name: '📁 Clone from your own repositories', value: 'own' },
+          { name: '🌐 Clone from external URL', value: 'external' }
+        ]
+      }
+    ]);
+
+    if (cloneType === 'own') {
+      await handleCloneOwnRepos();
+    } else {
+      await handleCloneExternalRepo();
+    }
+  } catch (error) {
+    throw error;
+  }
+}
+
+async function handleCloneOwnRepos() {
+  try {
+    // Ensure user is authenticated
+    const token = await ensureAuthenticated();
+    if (!token) {
+      console.error(chalk.red('Authentication required to access your repositories.'));
+      return;
+    }
+
+    console.log(chalk.yellow('\n📋 Fetching your repositories...'));
+    const repos = await githubService.listUserRepositories({ per_page: 100 });
+
+    if (repos.length === 0) {
+      console.log(chalk.yellow('No repositories found.'));
+      return;
+    }
+
+    // Format repos for selection
+    const repoChoices = repos.map(repo => ({
+      name: `${repo.private ? '🔒' : '🌐'} ${repo.full_name} - ${repo.description || 'No description'}`,
+      value: repo.clone_url,
+      short: repo.full_name
+    }));
+
+    const { selectedRepo } = await inquirer.prompt([
+      {
+        type: 'list',
+        name: 'selectedRepo',
+        message: 'Select a repository to clone:',
+        choices: repoChoices,
+        pageSize: 15
+      }
+    ]);
+
+    const { targetDirectory } = await inquirer.prompt([
+      {
+        type: 'input',
+        name: 'targetDirectory',
+        message: 'Enter target directory (leave empty for default):',
+        default: '',
+        validate: (input) => {
+          if (input.trim() === '.') {
+            return 'Cannot clone to current directory. Please enter a different directory name or leave empty for default.';
+          }
+          if (input.trim() === '..') {
+            return 'Cannot clone to parent directory. Please enter a different directory name or leave empty for default.';
+          }
+          return true;
+        }
+      }
+    ]);
+
+    console.log(chalk.yellow('\n📥 Cloning repository...'));
+    const cloneOptions = {};
+    if (targetDirectory && targetDirectory.trim()) {
+      cloneOptions.directory = targetDirectory.trim();
+    }
+    const result = await gitService.cloneRepository(selectedRepo, cloneOptions);
+    console.log(chalk.green('✅ ' + result));
+    
+    // Show helpful next steps
+    const clonedDir = targetDirectory && targetDirectory.trim() ? targetDirectory.trim() : selectedRepo.split('/').pop().replace('.git', '');
+    console.log(chalk.blue('\n📁 Next steps:'));
+    console.log(chalk.blue(`   cd ${clonedDir}`));
+    console.log(chalk.blue(`   ls -la  # Check if files were cloned successfully`));
+
+  } catch (error) {
+    if (error.message.includes('Authentication')) {
+      console.error(chalk.red('❌ Authentication failed. Please run "gitmate auth github" first.'));
+    } else {
+      console.error(chalk.red('❌ Error cloning repository:'), error.message);
+    }
+  }
+}
+
+async function handleCloneExternalRepo() {
+  try {
+    const { repoUrl } = await inquirer.prompt([
+      {
+        type: 'input',
+        name: 'repoUrl',
+        message: 'Enter repository URL (GitHub, GitLab, etc.):',
+        validate: input => {
+          if (!input.trim()) return 'Repository URL is required';
+          if (!input.includes('github.com') && !input.includes('gitlab.com') && !input.includes('bitbucket.org')) {
+            return 'Please enter a valid repository URL from GitHub, GitLab, or Bitbucket';
+          }
+          return true;
+        }
+      }
+    ]);
+
+    const { targetDirectory } = await inquirer.prompt([
+      {
+        type: 'input',
+        name: 'targetDirectory',
+        message: 'Enter target directory (leave empty for default):',
+        default: '',
+        validate: (input) => {
+          if (input.trim() === '.') {
+            return 'Cannot clone to current directory. Please enter a different directory name or leave empty for default.';
+          }
+          if (input.trim() === '..') {
+            return 'Cannot clone to parent directory. Please enter a different directory name or leave empty for default.';
+          }
+          return true;
+        }
+      }
+    ]);
+
+    console.log(chalk.yellow('\n📥 Attempting to clone repository...'));
+    
+    try {
+      const cloneOptions = {};
+      if (targetDirectory && targetDirectory.trim()) {
+        cloneOptions.directory = targetDirectory.trim();
+      }
+      const result = await gitService.cloneRepository(repoUrl, cloneOptions);
+      console.log(chalk.green('✅ ' + result));
+      
+      // Show helpful next steps
+      const clonedDir = targetDirectory && targetDirectory.trim() ? targetDirectory.trim() : repoUrl.split('/').pop().replace('.git', '');
+      console.log(chalk.blue('\n📁 Next steps:'));
+      console.log(chalk.blue(`   cd ${clonedDir}`));
+      console.log(chalk.blue(`   ls -la  # Check if files were cloned successfully`));
+    } catch (cloneError) {
+      if (cloneError.message.includes('Authentication failed') || cloneError.message.includes('not found')) {
+        console.log(chalk.yellow('\n🔒 This appears to be a private repository.'));
+        console.log(chalk.blue('To clone private repositories, you need to:'));
+        console.log(chalk.blue('1. Ensure you have access to the repository'));
+        console.log(chalk.blue('2. Use SSH keys or personal access tokens'));
+        console.log(chalk.blue('3. Or ask the repository owner to make it public'));
+      } else {
+        throw cloneError;
+      }
+    }
+
+  } catch (error) {
+    console.error(chalk.red('❌ Error:'), error.message);
   }
 }
 
@@ -1693,10 +1926,7 @@ export async function executeGitOperation(intentObj, userName) {
       }
       case 'clone_repo': {
         try {
-          const repoUrl = entities.repo_url || (await inquirer.prompt([{ type: 'input', name: 'repo_url', message: 'Repository URL to clone:' }])).repo_url;
-          // const targetPath = entities.target_path || (await inquirer.prompt([{ type: 'input', name: 'target_path', message: 'Target directory:' }])).target_path;
-          const result = await gitService.cloneRepository(repoUrl, targetPath);
-          console.log(chalk.green(result));
+          await handleInteractiveClone([]);
         } catch (error) {
           console.error(chalk.red('Error cloning repository:'), error.message);
         }

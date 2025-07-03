@@ -264,10 +264,33 @@ export async function cloneRepository(repoUrl, options = {}) {
         }
       }
     }
+    
     const git = simpleGit();
-    await git.clone(urlToClone, '.', options);
+    
+    // Extract repo name from URL for default directory name
+    let defaultDirName = '';
+    const match = repoUrl.match(/([^/]+?)(?:\.git)?$/);
+    if (match) {
+      defaultDirName = match[1];
+    }
+    
+    // Prepare clone options
+    const cloneOptions = [];
+    if (options.directory) {
+      cloneOptions.push(options.directory);
+    }
+    
+    // Add any additional options
+    if (options.branch) {
+      cloneOptions.push('-b', options.branch);
+    }
+    if (options.depth) {
+      cloneOptions.push('--depth', options.depth);
+    }
+    
+    await git.clone(urlToClone, ...cloneOptions);
 
-    const message = `Cloned ${repoUrl} to current directory`;
+    const message = `Cloned ${repoUrl} to ${options.directory || defaultDirName}`;
     logger.info(message, { service: serviceName });
     return message;
   } catch (error) {

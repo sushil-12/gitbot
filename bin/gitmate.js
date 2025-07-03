@@ -346,12 +346,12 @@ async function handleAiIntent(userInput) {
     const aiReady = await aiService.checkStatus();
     
     if (!aiReady) {
-      console.log('\nAI service is not available. Please check your configuration.');
+      console.log('\nAI service is temporarily unavailable. Please try again in some time. This is a temporary issue and will be resolved soon.');
       return;
     }
     
     const { intent, entities, confidence } = await aiService.parseIntent(userInput);
-    
+    console.log(intent)
     // If confidence is low or intent is unknown, show help or ask for clarification
     if (!intent || intent === 'unknown' || (confidence !== undefined && confidence < 0.5)) {
       console.log('\nSorry, I could not confidently understand your request. Here are some things you can try:');

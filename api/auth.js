@@ -405,40 +405,293 @@ app.get('/auth/failure', (req, res) => {
   `);
 });
 
-// Mistral AI proxy endpoint
+// Enhanced Cache Service
+import EnhancedQueryCacheService from './enhancedCacheService.js';
+const cacheService = new EnhancedQueryCacheService();
+
+// Initialize cache service
+cacheService.connect().catch(console.error);
+
+// Multiple Mistral API keys for load balancing
+const MISTRAL_API_KEYS = [
+  process.env.MISTRAL_API_KEY,
+  process.env.MISTRAL_API_KEY_2,
+  process.env.MISTRAL_API_KEY_3
+].filter(key => key); // Remove undefined keys
+
+let currentProviderIndex = 0;
+let providerFailures = new Map(); // Track failures per provider
+
+// Fallback intent detection function
+function getFallbackIntent(query) {
+  const lowerQuery = query.toLowerCase().trim();
+  
+  // Repository-related intents - PRIORITIZE list over create
+  if (lowerQuery.includes('repo') || lowerQuery.includes('repository')) {
+    if (lowerQuery.includes('list') || lowerQuery.includes('show') || lowerQuery.includes('display') || 
+        lowerQuery.includes('what') || lowerQuery.includes('my repositories') || lowerQuery.includes('my repos')) {
+      return { intent: 'list_repos', entities: {}, confidence: 0.9 };
+    }
+    if (lowerQuery.includes('create') || lowerQuery.includes('new') || lowerQuery.includes('make')) {
+      return { intent: 'create_repo', entities: {}, confidence: 0.9 };
+    }
+    if (lowerQuery.includes('clone') || lowerQuery.includes('download')) {
+      return { intent: 'clone_repo', entities: {}, confidence: 0.8 };
+    }
+  }
+  
+  // Branch-related intents
+  if (lowerQuery.includes('branch')) {
+    if (lowerQuery.includes('list') || lowerQuery.includes('show') || lowerQuery.includes('display')) {
+      return { intent: 'list_branches', entities: {}, confidence: 0.9 };
+    }
+    if (lowerQuery.includes('create') || lowerQuery.includes('new')) {
+      return { intent: 'create_branch', entities: {}, confidence: 0.8 };
+    }
+    if (lowerQuery.includes('checkout') || lowerQuery.includes('switch')) {
+      return { intent: 'checkout_branch', entities: {}, confidence: 0.8 };
+    }
+    if (lowerQuery.includes('merge')) {
+      return { intent: 'merge_branch', entities: {}, confidence: 0.8 };
+    }
+  }
+  
+  // Status and diff intents - PRIORITIZE these over generic repo operations
+  if (lowerQuery.includes('status') || lowerQuery.includes('what\'s changed') || 
+      lowerQuery.includes('current status') || (lowerQuery.includes('show') && lowerQuery.includes('change'))) {
+    return { intent: 'git_status', entities: {}, confidence: 0.9 };
+  }
+  if (lowerQuery.includes('diff') || lowerQuery.includes('difference') || lowerQuery.includes('differences')) {
+    return { intent: 'git_diff', entities: {}, confidence: 0.9 };
+  }
+  if (lowerQuery.includes('log') || lowerQuery.includes('history') || lowerQuery.includes('commits')) {
+    return { intent: 'git_log', entities: {}, confidence: 0.8 };
+  }
+  
+  // Git operations - PRIORITIZE these over generic repo operations
+  if (lowerQuery.includes('push')) {
+    return { intent: 'push_changes', entities: { branch: 'current', remote: 'origin' }, confidence: 0.9 };
+  }
+  if (lowerQuery.includes('pull') || lowerQuery.includes('sync')) {
+    return { intent: 'pull_changes', entities: { remote: 'origin' }, confidence: 0.9 };
+  }
+  if (lowerQuery.includes('commit')) {
+    return { intent: 'git_commit', entities: {}, confidence: 0.8 };
+  }
+  if (lowerQuery.includes('add') || lowerQuery.includes('stage')) {
+    return { intent: 'git_add', entities: {}, confidence: 0.8 };
+  }
+  if (lowerQuery.includes('revert')) {
+    return { intent: 'revert_commit', entities: {}, confidence: 0.8 };
+  }
+  
+  // Pull request intents
+  if (lowerQuery.includes('pr') || lowerQuery.includes('pull request') || lowerQuery.includes('merge request')) {
+    return { intent: 'create_pr', entities: {}, confidence: 0.9 };
+  }
+  
+  // Help and authentication intents
+  if (lowerQuery.includes('help') || lowerQuery.includes('what can') || lowerQuery.includes('capabilities')) {
+    return { intent: 'help', entities: {}, confidence: 0.9 };
+  }
+  if (lowerQuery.includes('login') || lowerQuery.includes('authenticate') || lowerQuery.includes('logged in')) {
+    return { intent: 'greeting', entities: {}, confidence: 0.8 };
+  }
+  
+  // Greeting intents
+  if (lowerQuery.includes('hello') || lowerQuery.includes('hi') || lowerQuery.includes('hey')) {
+    return { intent: 'greeting', entities: {}, confidence: 0.9 };
+  }
+  
+  return { intent: 'unknown', entities: { error: 'Could not determine intent' }, confidence: 0.0 };
+}
+
+// Mistral AI proxy endpoint with enhanced caching and provider fallback
 app.post('/api/mistral', async (req, res) => {
   const { messages, options } = req.body;
-  const apiKey = process.env.MISTRAL_API_KEY;
 
-  if (!apiKey) {
-      return res.status(500).json({ error: 'Mistral API key not configured on server.' });
+  if (MISTRAL_API_KEYS.length === 0) {
+      return res.status(500).json({ error: 'No Mistral API keys configured on server.' });
   }
 
   try {
-      const response = await fetch('https://api.mistral.ai/v1/chat/completions', {
-          method: 'POST',
-          headers: {
-              'Content-Type': 'application/json',
-              'Authorization': `Bearer ${apiKey}`
-          },
-          body: JSON.stringify({
-              model: options?.model || 'mistral-large-latest',
-              messages,
-              max_tokens: options?.max_tokens || 1000,
-              temperature: options?.temperature || 0.7
-          })
-      });
+      // Extract user query for caching
+      const userQuery = messages?.[0]?.content;
+      let cachedResponse = null;
 
-      if (!response.ok) {
-          return res.status(response.status).json({ error: await response.text() });
+      // Check cache for all queries (including intent parsing)
+      if (userQuery) {
+          cachedResponse = await cacheService.findSimilarQuery(userQuery);
+      }
+
+      if (cachedResponse) {
+          return res.status(200).json({
+              id: 'cached-response-' + Date.now(),
+              object: 'chat.completion',
+              created: Math.floor(Date.now() / 1000),
+              model: 'mistral-large-latest',
+              choices: [{
+                  index: 0,
+                  message: {
+                      content: JSON.stringify({
+                          intent: cachedResponse.intent,
+                          entities: cachedResponse.entities,
+                          confidence: cachedResponse.confidence
+                      })
+                  },
+                  finish_reason: 'stop'
+              }],
+              usage: {
+                  prompt_tokens: 0,
+                  completion_tokens: 0,
+                  total_tokens: 0
+              }
+          });
+      }
+
+      // No cache hit, call Mistral API with provider fallback
+      console.log(`🤖 Calling Mistral API for: "${userQuery}"`);
+      
+      let response;
+      let lastError;
+      
+      // Try each provider until one works
+      for (let attempt = 0; attempt < MISTRAL_API_KEYS.length; attempt++) {
+        const apiKey = MISTRAL_API_KEYS[currentProviderIndex];
+        console.log(`🔄 Using provider ${currentProviderIndex + 1}/${MISTRAL_API_KEYS.length}`);
+        
+        try {
+          response = await fetch('https://api.mistral.ai/v1/chat/completions', {
+              method: 'POST',
+              headers: {
+                  'Content-Type': 'application/json',
+                  'Authorization': `Bearer ${apiKey}`
+              },
+              body: JSON.stringify({
+                  model: options?.model || 'mistral-large-latest',
+                  messages,
+                  max_tokens: options?.max_tokens || 1000,
+                  temperature: options?.temperature || 0.7
+              })
+          });
+
+          if (response.ok) {
+            console.log(`✅ Provider ${currentProviderIndex + 1} succeeded`);
+            break; // Success, exit the loop
+          }
+          
+          if (response.status === 429) {
+            console.log(`⚠️ Provider ${currentProviderIndex + 1} hit rate limit, switching...`);
+            providerFailures.set(currentProviderIndex, Date.now());
+            currentProviderIndex = (currentProviderIndex + 1) % MISTRAL_API_KEYS.length;
+            continue; // Try next provider
+          }
+          
+          // Other error, try next provider
+          lastError = await response.text();
+          console.log(`❌ Provider ${currentProviderIndex + 1} failed: ${response.status}`);
+          currentProviderIndex = (currentProviderIndex + 1) % MISTRAL_API_KEYS.length;
+          
+        } catch (error) {
+          console.log(`❌ Provider ${currentProviderIndex + 1} error: ${error.message}`);
+          lastError = error.message;
+          currentProviderIndex = (currentProviderIndex + 1) % MISTRAL_API_KEYS.length;
+        }
+      }
+      
+      // If all providers failed, try to provide a fallback response for intent parsing
+      if (!response || !response.ok) {
+        console.error('❌ All providers failed');
+        
+        // For intent parsing requests, provide a fallback response
+        if (userQuery && messages && messages.length > 0) {
+          const fallbackIntent = getFallbackIntent(userQuery);
+          console.log(`🔄 Using fallback intent: ${fallbackIntent.intent}`);
+          
+          return res.status(200).json({
+            id: 'fallback-response-' + Date.now(),
+            object: 'chat.completion',
+            created: Math.floor(Date.now() / 1000),
+            model: 'mistral-large-latest',
+            choices: [{
+              index: 0,
+              message: {
+                content: JSON.stringify(fallbackIntent)
+              },
+              finish_reason: 'stop'
+            }],
+            usage: {
+              prompt_tokens: 0,
+              completion_tokens: 0,
+              total_tokens: 0
+            }
+          });
+        }
+        
+        return res.status(500).json({ 
+          error: 'All Mistral providers are currently unavailable. Please try again later.',
+          details: lastError
+        });
       }
 
       const data = await response.json();
+      
+      // Cache the response if it's an intent parsing request
+      if (userQuery && data.choices?.[0]?.message?.content) {
+          try {
+              const content = data.choices[0].message.content;
+              
+              // Handle markdown-wrapped JSON responses
+              let jsonContent = content.trim();
+              if (jsonContent.startsWith('```json')) {
+                  jsonContent = jsonContent.replace(/^```json\s*/, '').replace(/\s*```$/, '');
+              } else if (jsonContent.startsWith('```')) {
+                  jsonContent = jsonContent.replace(/^```\s*/, '').replace(/\s*```$/, '');
+              }
+              
+              console.log('Cleaned JSON content:', jsonContent);
+              const parsed = JSON.parse(jsonContent);
+              
+              if (parsed.intent && typeof parsed.intent === 'string') {
+                  console.log('✅ Caching intent response:', parsed.intent);
+                  await cacheService.cacheResponse(
+                      userQuery,
+                      parsed.intent,
+                      parsed.entities || {},
+                      parsed.confidence || 0.8
+                  );
+              }
+          } catch (e) {
+              // Not a JSON response, don't cache
+              console.log('❌ Not caching non-JSON response:', e.message);
+          }
+      }
+
       res.status(200).json(data);
+  } catch (err) {
+      console.error('❌ Mistral API error:', err.message);
+      console.error('❌ Full error:', err);
+      res.status(500).json({ error: err.message });
+  }
+});
+
+// Cache management endpoints
+app.get('/api/cache/stats', async (req, res) => {
+  try {
+      const stats = await cacheService.getCacheStats();
+      res.json(stats);
   } catch (err) {
       res.status(500).json({ error: err.message });
   }
+});
 
+app.delete('/api/cache/clear', async (req, res) => {
+  try {
+      const success = await cacheService.clearCache();
+      res.json({ success, message: 'Cache cleared successfully' });
+  } catch (err) {
+      res.status(500).json({ error: err.message });
+  }
 });
 
 
@@ -451,7 +704,20 @@ export default app;
 // Start server when running locally or on Render (ESM compatible)
 if (process.env.RENDER || process.argv[1].endsWith('auth.js')) {
   const port = process.env.PORT || 3000;
-  app.listen(port, () => {
+  const server = app.listen(port, () => {
     console.log(`Server running on port ${port}`);
+  });
+  
+  // Add error handling
+  server.on('error', (error) => {
+    console.error('❌ Server error:', error);
+  });
+  
+  process.on('uncaughtException', (error) => {
+    console.error('❌ Uncaught Exception:', error);
+  });
+  
+  process.on('unhandledRejection', (reason, promise) => {
+    console.error('❌ Unhandled Rejection at:', promise, 'reason:', reason);
   });
 } 

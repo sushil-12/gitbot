@@ -1,0 +1,351 @@
+{
+  "summary": {
+    "totalTests": 25,
+    "successfulTests": 25,
+    "failedTests": 0,
+    "duration": "82.73s",
+    "timestamp": "2025-07-03T10:22:27.949Z",
+    "intentDistribution": {
+      "create_repo": 9,
+      "unknown": 9,
+      "unrelated": 1,
+      "push_changes": 3,
+      "git_log": 1,
+      "list_repos": 1,
+      "git_commit": 1
+    },
+    "lowConfidenceResults": [],
+    "unexpectedIntents": [
+      {
+        "command": "Create a public repo named open-source-gems",
+        "intent": "unknown"
+      },
+      {
+        "command": "Login to GitMate",
+        "intent": "unknown",
+        "confidence": 0.9
+      },
+      {
+        "command": "How do I log in?",
+        "intent": "unrelated",
+        "confidence": 0.9
+      },
+      {
+        "command": "Use my GitHub token to sign in",
+        "intent": "unknown",
+        "confidence": 0.9
+      },
+      {
+        "command": "Logout from GitMate",
+        "intent": "unknown"
+      },
+      {
+        "command": "Am I already logged in?",
+        "intent": "unknown"
+      },
+      {
+        "command": "Get details of the repo blog-engine",
+        "intent": "unknown",
+        "confidence": 0.9
+      },
+      {
+        "command": "Initialize a git project here",
+        "intent": "unknown"
+      },
+      {
+        "command": "Set description for this repo to 'a demo for GitMate'",
+        "intent": "unknown"
+      },
+      {
+        "command": "Open the GitHub page for this project",
+        "intent": "unknown"
+      }
+    ]
+  },
+  "results": [
+    {
+      "command": "Create a new repository called my-awesome-app",
+      "intent": "create_repo",
+      "entities": {
+        "repository_name": "my-awesome-app"
+      },
+      "confidence": 0.9,
+      "success": true,
+      "error": null,
+      "timestamp": "2025-07-03T10:21:07.626Z"
+    },
+    {
+      "command": "Make a repo named todo-app",
+      "intent": "create_repo",
+      "entities": {
+        "repo_name": "todo-app"
+      },
+      "confidence": 0.9,
+      "success": true,
+      "error": null,
+      "timestamp": "2025-07-03T10:21:10.379Z"
+    },
+    {
+      "command": "Can you start a new repo for me called portfolio-site?",
+      "intent": "create_repo",
+      "entities": {
+        "repo_name": "portfolio-site"
+      },
+      "confidence": 0.9,
+      "success": true,
+      "error": null,
+      "timestamp": "2025-07-03T10:21:13.661Z"
+    },
+    {
+      "command": "Initialize a fresh GitHub repo titled gitmate-demo",
+      "intent": "create_repo",
+      "entities": {
+        "repo_name": "gitmate-demo"
+      },
+      "confidence": 0.9,
+      "success": true,
+      "error": null,
+      "timestamp": "2025-07-03T10:21:23.057Z"
+    },
+    {
+      "command": "Create a public repo named open-source-gems",
+      "intent": "unknown",
+      "entities": {
+        "error": "Mistral Proxy error: 500 {\"error\":\"All Mistral providers are currently unavailable. Please try again later.\"}"
+      },
+      "success": true,
+      "error": null,
+      "timestamp": "2025-07-03T10:21:24.968Z"
+    },
+    {
+      "command": "I want to delete the repository test-app",
+      "intent": "create_repo",
+      "entities": {
+        "repository_name": "test-app"
+      },
+      "confidence": 0.9,
+      "success": true,
+      "error": null,
+      "timestamp": "2025-07-03T10:21:36.948Z"
+    },
+    {
+      "command": "Login to GitMate",
+      "intent": "unknown",
+      "entities": {},
+      "confidence": 0.9,
+      "success": true,
+      "error": null,
+      "timestamp": "2025-07-03T10:21:40.570Z"
+    },
+    {
+      "command": "How do I log in?",
+      "intent": "unrelated",
+      "entities": {},
+      "confidence": 0.9,
+      "success": true,
+      "error": null,
+      "timestamp": "2025-07-03T10:21:43.041Z"
+    },
+    {
+      "command": "Use my GitHub token to sign in",
+      "intent": "unknown",
+      "entities": {},
+      "confidence": 0.9,
+      "success": true,
+      "error": null,
+      "timestamp": "2025-07-03T10:21:47.003Z"
+    },
+    {
+      "command": "Logout from GitMate",
+      "intent": "unknown",
+      "entities": {
+        "error": "Mistral Proxy error: 500 {\"error\":\"All Mistral providers are currently unavailable. Please try again later.\"}"
+      },
+      "success": true,
+      "error": null,
+      "timestamp": "2025-07-03T10:21:48.897Z"
+    },
+    {
+      "command": "Am I already logged in?",
+      "intent": "unknown",
+      "entities": {
+        "error": "Mistral Proxy error: 500 {\"error\":\"All Mistral providers are currently unavailable. Please try again later.\"}"
+      },
+      "success": true,
+      "error": null,
+      "timestamp": "2025-07-03T10:21:50.779Z"
+    },
+    {
+      "command": "Push my latest code",
+      "intent": "push_changes",
+      "entities": {
+        "branch": "current",
+        "remote": "origin"
+      },
+      "confidence": 0.9,
+      "success": true,
+      "error": null,
+      "timestamp": "2025-07-03T10:21:53.497Z"
+    },
+    {
+      "command": "Commit and push all my changes",
+      "intent": "create_repo",
+      "entities": {
+        "repository_name": "my-awesome-project"
+      },
+      "confidence": 0.9,
+      "success": true,
+      "error": null,
+      "timestamp": "2025-07-03T10:21:54.669Z"
+    },
+    {
+      "command": "Stage all files and push to GitHub",
+      "intent": "push_changes",
+      "entities": {
+        "branch": "current",
+        "remote": "origin"
+      },
+      "confidence": 0.9,
+      "success": true,
+      "error": null,
+      "timestamp": "2025-07-03T10:21:56.977Z"
+    },
+    {
+      "command": "I want to upload my code to a new repo",
+      "intent": "create_repo",
+      "entities": {},
+      "confidence": 0.9,
+      "success": true,
+      "error": null,
+      "timestamp": "2025-07-03T10:21:59.039Z"
+    },
+    {
+      "command": "Push changes with message \"added login flow\"",
+      "intent": "push_changes",
+      "entities": {
+        "message": "added login flow",
+        "branch": "current",
+        "remote": "origin"
+      },
+      "confidence": 0.9,
+      "success": true,
+      "error": null,
+      "timestamp": "2025-07-03T10:22:01.931Z"
+    },
+    {
+      "command": "List all my GitHub repositories",
+      "intent": "create_repo",
+      "entities": {
+        "repository_name": "my-awesome-project"
+      },
+      "confidence": 0.9,
+      "success": true,
+      "error": null,
+      "timestamp": "2025-07-03T10:22:03.102Z"
+    },
+    {
+      "command": "Show me my recent commits",
+      "intent": "git_log",
+      "entities": {},
+      "confidence": 0.9,
+      "success": true,
+      "error": null,
+      "timestamp": "2025-07-03T10:22:05.610Z"
+    },
+    {
+      "command": "How many repos do I have?",
+      "intent": "list_repos",
+      "entities": {},
+      "confidence": 0.9,
+      "success": true,
+      "error": null,
+      "timestamp": "2025-07-03T10:22:07.628Z"
+    },
+    {
+      "command": "Get details of the repo blog-engine",
+      "intent": "unknown",
+      "entities": {},
+      "confidence": 0.9,
+      "success": true,
+      "error": null,
+      "timestamp": "2025-07-03T10:22:17.800Z"
+    },
+    {
+      "command": "Generate a commit message for the changes I made",
+      "intent": "git_commit",
+      "entities": {},
+      "confidence": 0.9,
+      "success": true,
+      "error": null,
+      "timestamp": "2025-07-03T10:22:20.149Z"
+    },
+    {
+      "command": "Initialize a git project here",
+      "intent": "unknown",
+      "entities": {
+        "error": "Mistral Proxy error: 500 {\"error\":\"All Mistral providers are currently unavailable. Please try again later.\"}"
+      },
+      "success": true,
+      "error": null,
+      "timestamp": "2025-07-03T10:22:22.010Z"
+    },
+    {
+      "command": "Set description for this repo to 'a demo for GitMate'",
+      "intent": "unknown",
+      "entities": {
+        "error": "Mistral Proxy error: 500 {\"error\":\"All Mistral providers are currently unavailable. Please try again later.\"}"
+      },
+      "success": true,
+      "error": null,
+      "timestamp": "2025-07-03T10:22:23.890Z"
+    },
+    {
+      "command": "Open the GitHub page for this project",
+      "intent": "unknown",
+      "entities": {
+        "error": "Mistral Proxy error: 500 {\"error\":\"All Mistral providers are currently unavailable. Please try again later.\"}"
+      },
+      "success": true,
+      "error": null,
+      "timestamp": "2025-07-03T10:22:25.769Z"
+    },
+    {
+      "command": "What can GitMate do?",
+      "intent": "create_repo",
+      "entities": {
+        "repository_name": "my-awesome-project"
+      },
+      "confidence": 0.9,
+      "success": true,
+      "error": null,
+      "timestamp": "2025-07-03T10:22:26.948Z"
+    }
+  ],
+  "testCommands": [
+    "Create a new repository called my-awesome-app",
+    "Make a repo named todo-app",
+    "Can you start a new repo for me called portfolio-site?",
+    "Initialize a fresh GitHub repo titled gitmate-demo",
+    "Create a public repo named open-source-gems",
+    "I want to delete the repository test-app",
+    "Login to GitMate",
+    "How do I log in?",
+    "Use my GitHub token to sign in",
+    "Logout from GitMate",
+    "Am I already logged in?",
+    "Push my latest code",
+    "Commit and push all my changes",
+    "Stage all files and push to GitHub",
+    "I want to upload my code to a new repo",
+    "Push changes with message \"added login flow\"",
+    "List all my GitHub repositories",
+    "Show me my recent commits",
+    "How many repos do I have?",
+    "Get details of the repo blog-engine",
+    "Generate a commit message for the changes I made",
+    "Initialize a git project here",
+    "Set description for this repo to 'a demo for GitMate'",
+    "Open the GitHub page for this project",
+    "What can GitMate do?"
+  ]
+}

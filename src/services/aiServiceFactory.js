@@ -68,7 +68,8 @@ async function getAnthropicClient() {
 
 async function getMistralClient() {
   if (!mistralClient) {
-    const mistralProxyUrl ='https://gitbot-1-24a9.onrender.com/api/mistral';
+    // const mistralProxyUrl ='https://gitbot-1-24a9.onrender.com/api/mistral';
+    const mistralProxyUrl = 'http://localhost:3000/api/mistral';
     mistralClient = {
       async chat(messages, options = {}) {
         const response = await fetch(mistralProxyUrl, {
@@ -80,7 +81,7 @@ async function getMistralClient() {
           throw new Error(`Mistral Proxy error: ${response.status} ${await response.text()}`);
         }
         const data = await response.json();
-        
+        console.log('🔍 Mistral response:', data.choices[0].message);
         // Better response handling
         if (data.choices && data.choices[0] && data.choices[0].message && data.choices[0].message.content) {
           return data.choices[0].message.content;
@@ -344,36 +345,87 @@ export const aiService = {
         return cached;
       }
 
-      // Enhanced prompt for better intent understanding
-      const prompt = `Analyze this Git/GitHub command and extract the intent and entities. Be very specific about the context.
+      // Enhanced prompt with better intent classification and reduced bias
+      const prompt = `You are an intelligent intent parser for Git and GitHub commands. Analyze this query: "${query}"
 
-      Query: "${query}"
-      
-      Important context clues:
-      - "list my changes" = git status (show modified/staged files)
-      - "list my branches" = list local branches
-      - "list my repos" = list GitHub repositories
-      - "show status" = git status
-      - "show diff" = git diff
-      - "show log" = git log
-      - "push changes" = git push
-      - "pull changes" = git pull
-      - "commit changes" = git commit
-      - "create pr" = create_pull_request
-      - "create pull request" = create_pull_request
-      - "create merge request" = create_pull_request
-      - "make a pr" = create_pull_request
-      - "open a pr" = create_pull_request
-      - "can you create a pr" = create_pull_request
-      
-      Return a JSON object with:
-      - intent: The main action (list_repos, list_branches, git_status, git_diff, git_log, push_changes, create_pr, etc.)
-      - entities: Object with relevant parameters (branch, commit_message, files, head_branch, base_branch, title, body, etc.)
-      - confidence: Your confidence score (0-1)
-      
-      Return only valid JSON:`;
+IMPORTANT: Respond with ONLY a valid JSON object. No text, no explanation, no markdown, no code blocks.
 
-      const response = await this.generateResponse(prompt, { max_tokens: 500, temperature: 0.1 });
+Required JSON format:
+{
+  "intent": "intent_name",
+  "entities": {},
+  "confidence": 0.9
+}
+
+CRITICAL RULES:
+1. DO NOT default to create_repo unless explicitly creating a repository
+2. "List", "show", "display" commands should be list_repos, list_branches, git_status, etc.
+3. "Push" commands should be push_changes
+4. "Pull" commands should be pull_changes
+5. "Commit" commands should be git_commit
+6. "Add" commands should be git_add
+7. "Status" or "what's changed" should be git_status
+8. "Diff" or "differences" should be git_diff
+9. "Branch" listing should be list_branches
+10. "PR" or "pull request" should be create_pr
+11. "Help" or "what can you do" should be help
+12. "Login", "authenticate" should be greeting
+13. "Clone" should be clone_repo
+14. "Delete" should be unknown (not implemented)
+
+Available intents: list_repos, list_branches, git_status, git_diff, git_log, push_changes, pull_changes, git_commit, git_add, create_branch, checkout_branch, merge_branch, clone_repo, create_repo, create_pr, revert_commit, greeting, thanks, unrelated, help, error, unknown
+
+EXACT MAPPINGS:
+- "list my repositories" → list_repos
+- "show my repos" → list_repos  
+- "what repositories do I have" → list_repos
+- "display my repos" → list_repos
+- "show repositories" → list_repos
+- "list all repos" → list_repos
+- "create a new repository" → create_repo
+- "create repository" → create_repo
+- "new repository" → create_repo
+- "make a repo" → create_repo
+- "create a repo" → create_repo
+- "show branches" → list_branches
+- "list branches" → list_branches
+- "show status" → git_status
+- "what's changed" → git_status
+- "current status" → git_status
+- "show diff" → git_diff
+- "show differences" → git_diff
+- "show log" → git_log
+- "show history" → git_log
+- "push changes" → push_changes
+- "push my changes" → push_changes
+- "pull changes" → pull_changes
+- "pull latest" → pull_changes
+- "commit" → git_commit
+- "add files" → git_add
+- "stage changes" → git_add
+- "create branch" → create_branch
+- "checkout branch" → checkout_branch
+- "switch branch" → checkout_branch
+- "merge branch" → merge_branch
+- "clone repo" → clone_repo
+- "create pull request" → create_pr
+- "open a PR" → create_pr
+- "create pr" → create_pr
+- "submit a pull request" → create_pr
+- "make a merge request" → create_pr
+- "revert commit" → revert_commit
+- "login" → greeting
+- "authenticate" → greeting
+- "help" → help
+- "what can you do" → help
+
+IMPORTANT: Only use create_repo when explicitly creating a new repository. For listing, showing, or managing existing repositories, use list_repos.
+
+JSON response:`;
+
+      const response = await this.generateResponse(prompt, { max_tokens: 200, temperature: 0.1 });
+      
+      console.log('🔍 Intent parsing response:', response);
       
       let parsed;
       try {
@@ -384,18 +436,24 @@ export const aiService = {
         } else if (jsonContent.startsWith('```')) {
           jsonContent = jsonContent.replace(/^```\s*/, '').replace(/\s*```$/, '');
         }
+        console.log('🔍 Cleaned JSON content:', jsonContent);
         parsed = JSON.parse(jsonContent);
       } catch (parseError) {
+        console.log('🔍 JSON parse error:', parseError.message);
         // Try to extract JSON from the response
         const jsonMatch = response.match(/\{[\s\S]*\}/);
         if (jsonMatch) {
           try {
             parsed = JSON.parse(jsonMatch[0]);
+            console.log('🔍 Extracted JSON from response');
           } catch (secondError) {
-            parsed = { intent: 'unknown', entities: { error: 'Failed to parse response' } };
+            console.log('🔍 Failed to parse extracted JSON, using fallback');
+            parsed = this.fallbackIntentDetection(query);
           }
         } else {
-          parsed = { intent: 'unknown', entities: { error: 'Failed to parse response' } };
+          console.log('🔍 No JSON found in response, using fallback');
+          // Fallback to keyword-based intent detection
+          parsed = this.fallbackIntentDetection(query);
         }
       }
 
@@ -408,16 +466,237 @@ export const aiService = {
         parsed.entities.remote = 'origin';
       }
 
+      // Validate and correct obvious misclassifications
+      parsed = this.validateAndCorrectIntent(query, parsed);
+      
+      // Additional validation: if we got list_repos but the query doesn't match repository listing patterns
+      if (parsed.intent === 'list_repos') {
+        const lowerQuery = query.toLowerCase();
+        const isRepoListing = lowerQuery.includes('repo') || lowerQuery.includes('repository');
+        const isListingAction = lowerQuery.includes('list') || lowerQuery.includes('show') || 
+                               lowerQuery.includes('display') || lowerQuery.includes('what');
+        
+        // If it's not clearly a repository listing command, try to determine the correct intent
+        if (!isRepoListing || !isListingAction) {
+          const correctedIntent = this.determineCorrectIntent(query);
+          if (correctedIntent && correctedIntent !== 'list_repos') {
+            console.log(`🔍 Corrected list_repo → ${correctedIntent}`);
+            parsed.intent = correctedIntent;
+            parsed.entities = {};
+          }
+        }
+      }
+      
+      // Fix git_add misclassifications for git_init
+      if (parsed.intent === 'git_add' && query.toLowerCase().includes('init')) {
+        parsed.intent = 'git_init';
+        parsed.entities = {};
+        console.log('🔍 Corrected git_add → git_init');
+      }
+      
+      // Fix unknown intent for authentication and help
+      if (parsed.intent === 'unknown') {
+        const lowerQuery = query.toLowerCase();
+        if (lowerQuery.includes('login') || lowerQuery.includes('logout') || lowerQuery.includes('authenticate')) {
+          parsed.intent = 'greeting';
+          console.log('🔍 Corrected unknown → greeting');
+        } else if (lowerQuery.includes('help') || lowerQuery.includes('what can') || lowerQuery.includes('how do i')) {
+          parsed.intent = 'help';
+          console.log('🔍 Corrected unknown → help');
+        }
+      }
+      
+      // Fix greeting intent for help queries
+      if (parsed.intent === 'greeting' && query.toLowerCase().includes('how do i')) {
+        parsed.intent = 'help';
+        console.log('🔍 Corrected greeting → help');
+      }
+      
+      // Fix pull_changes for pull request queries
+      if (parsed.intent === 'pull_changes' && 
+          (query.toLowerCase().includes('pull request') || query.toLowerCase().includes('pr'))) {
+        parsed.intent = 'create_pr';
+        console.log('🔍 Corrected pull_changes → create_pr');
+      }
+
       aiResponseCache.set(cacheKey, parsed);
+      console.log('🔍 Final parsed intent:', parsed);
       return parsed;
     } catch (error) {
       if (error.message && error.message.includes('429')) {
         logger.error('AI service rate limit reached (429):', { message: error.message, service: serviceName });
         return { intent: 'error', entities: { error: '⚠️ The AI service is currently overloaded. Please wait a few minutes and try again.' } };
       }
+
       logger.error('Intent parsing failed:', { message: error.message, service: serviceName });
+      console.log('🔍 Intent parsing error:', { message: error.message, service: serviceName });
       return { intent: 'unknown', entities: { error: error.message } };
     }
+  },
+
+  // New method to validate and correct obvious misclassifications
+  validateAndCorrectIntent(query, parsed) {
+    const lowerQuery = query.toLowerCase();
+    
+    // Fix common misclassifications
+    if (parsed.intent === 'create_repo') {
+      // Check if this should actually be list_repos
+      if (lowerQuery.includes('list') || lowerQuery.includes('show') || 
+          lowerQuery.includes('display') || lowerQuery.includes('what') ||
+          lowerQuery.includes('my repositories') || lowerQuery.includes('my repos')) {
+        parsed.intent = 'list_repos';
+        parsed.entities = {}; // Clear incorrect entities
+        console.log('🔍 Corrected create_repo → list_repos');
+      }
+    }
+    
+    // Fix git status misclassifications
+    if (parsed.intent === 'create_repo' && 
+        (lowerQuery.includes('status') || lowerQuery.includes('changed') || 
+         lowerQuery.includes('what\'s changed') || lowerQuery.includes('current status'))) {
+      parsed.intent = 'git_status';
+      parsed.entities = {};
+      console.log('🔍 Corrected create_repo → git_status');
+    }
+    
+    // Fix git diff misclassifications
+    if (parsed.intent === 'create_repo' && 
+        (lowerQuery.includes('diff') || lowerQuery.includes('differences'))) {
+      parsed.intent = 'git_diff';
+      parsed.entities = {};
+      console.log('🔍 Corrected create_repo → git_diff');
+    }
+    
+    // Fix list_branches misclassifications
+    if (parsed.intent === 'create_repo' && 
+        (lowerQuery.includes('branches') && (lowerQuery.includes('list') || lowerQuery.includes('show')))) {
+      parsed.intent = 'list_branches';
+      parsed.entities = {};
+      console.log('🔍 Corrected create_repo → list_branches');
+    }
+    
+    // Fix push_changes misclassifications
+    if (parsed.intent === 'create_repo' && lowerQuery.includes('push')) {
+      parsed.intent = 'push_changes';
+      parsed.entities = { branch: 'current', remote: 'origin' };
+      console.log('🔍 Corrected create_repo → push_changes');
+    }
+    
+    // Fix pull_changes misclassifications
+    if (parsed.intent === 'create_repo' && lowerQuery.includes('pull')) {
+      parsed.intent = 'pull_changes';
+      parsed.entities = { remote: 'origin' };
+      console.log('🔍 Corrected create_repo → pull_changes');
+    }
+    
+    // Fix create_pr misclassifications
+    if (parsed.intent === 'create_repo' && 
+        (lowerQuery.includes('pull request') || lowerQuery.includes('pr') || 
+         lowerQuery.includes('merge request'))) {
+      parsed.intent = 'create_pr';
+      parsed.entities = {};
+      console.log('🔍 Corrected create_repo → create_pr');
+    }
+    
+    // Fix help misclassifications
+    if (parsed.intent === 'create_repo' && 
+        (lowerQuery.includes('help') || lowerQuery.includes('what can') || 
+         lowerQuery.includes('capabilities'))) {
+      parsed.intent = 'help';
+      parsed.entities = {};
+      console.log('🔍 Corrected create_repo → help');
+    }
+    
+    // Fix git_add misclassifications
+    if (parsed.intent === 'push_changes' && 
+        (lowerQuery.includes('stage') || lowerQuery.includes('add') && !lowerQuery.includes('push'))) {
+      parsed.intent = 'git_add';
+      parsed.entities = {};
+      console.log('🔍 Corrected push_changes → git_add');
+    }
+    
+    return parsed;
+  },
+
+  // New method to determine correct intent when list_repos is incorrectly returned
+  determineCorrectIntent(query) {
+    const lowerQuery = query.toLowerCase();
+    
+    // Git status and changes
+    if (lowerQuery.includes('status') || lowerQuery.includes('what\'s changed') || 
+        lowerQuery.includes('current status') || lowerQuery.includes('changed') ||
+        lowerQuery.includes('what changed')) {
+      return 'git_status';
+    }
+    
+    // Git diff
+    if (lowerQuery.includes('diff') || lowerQuery.includes('difference') || lowerQuery.includes('differences')) {
+      return 'git_diff';
+    }
+    
+    // Branch operations
+    if (lowerQuery.includes('branch')) {
+      if (lowerQuery.includes('list') || lowerQuery.includes('show') || lowerQuery.includes('display')) {
+        return 'list_branches';
+      }
+      if (lowerQuery.includes('create') || lowerQuery.includes('new')) {
+        return 'create_branch';
+      }
+      if (lowerQuery.includes('checkout') || lowerQuery.includes('switch')) {
+        return 'checkout_branch';
+      }
+    }
+    
+    // Git operations
+    if (lowerQuery.includes('push')) {
+      return 'push_changes';
+    }
+    if (lowerQuery.includes('pull') || lowerQuery.includes('sync')) {
+      return 'pull_changes';
+    }
+    if (lowerQuery.includes('commit')) {
+      return 'git_commit';
+    }
+    if (lowerQuery.includes('add') || lowerQuery.includes('stage')) {
+      return 'git_add';
+    }
+    
+    // Pull request operations - PRIORITIZE over pull operations
+    if (lowerQuery.includes('pr') || lowerQuery.includes('pull request') || lowerQuery.includes('merge request') ||
+        lowerQuery.includes('create a pull') || lowerQuery.includes('submit a pull')) {
+      return 'create_pr';
+    }
+    
+    // Git operations - PRIORITIZE these over generic repo operations
+    if (lowerQuery.includes('push')) {
+      return 'push_changes';
+    }
+    if (lowerQuery.includes('pull') || lowerQuery.includes('sync')) {
+      return 'pull_changes';
+    }
+    
+    // Clone operations
+    if (lowerQuery.includes('clone')) {
+      return 'clone_repo';
+    }
+    
+    // Git init - PRIORITIZE over git_add
+    if (lowerQuery.includes('init') || lowerQuery.includes('initialize') || 
+        (lowerQuery.includes('git') && lowerQuery.includes('here'))) {
+      return 'git_init';
+    }
+    
+    // Authentication and help
+    if (lowerQuery.includes('login') || lowerQuery.includes('authenticate') || lowerQuery.includes('logged in') || 
+        lowerQuery.includes('logout') || lowerQuery.includes('am i logged')) {
+      return 'greeting';
+    }
+    if (lowerQuery.includes('help') || lowerQuery.includes('what can') || lowerQuery.includes('capabilities') || 
+        lowerQuery.includes('how do i')) {
+      return 'help';
+    }
+    
+    return null; // Could not determine
   },
 
   async generateConfirmation(parsed, username = 'there') {
@@ -537,6 +816,89 @@ export const aiService = {
       - GitHub PRs/issues
       Ask me about any of these!`;
     }
+  },
+
+  fallbackIntentDetection(query) {
+    const lowerQuery = query.toLowerCase().trim();
+    
+    // Repository-related intents - PRIORITIZE list over create
+    if (lowerQuery.includes('repo') || lowerQuery.includes('repository')) {
+      if (lowerQuery.includes('list') || lowerQuery.includes('show') || lowerQuery.includes('display') || 
+          lowerQuery.includes('what') || lowerQuery.includes('my repositories') || lowerQuery.includes('my repos')) {
+        return { intent: 'list_repos', entities: {}, confidence: 0.9 };
+      }
+      if (lowerQuery.includes('create') || lowerQuery.includes('new') || lowerQuery.includes('make')) {
+        return { intent: 'create_repo', entities: {}, confidence: 0.9 };
+      }
+      if (lowerQuery.includes('clone') || lowerQuery.includes('download')) {
+        return { intent: 'clone_repo', entities: {}, confidence: 0.8 };
+      }
+    }
+    
+    // Branch-related intents
+    if (lowerQuery.includes('branch')) {
+      if (lowerQuery.includes('list') || lowerQuery.includes('show') || lowerQuery.includes('display')) {
+        return { intent: 'list_branches', entities: {}, confidence: 0.9 };
+      }
+      if (lowerQuery.includes('create') || lowerQuery.includes('new')) {
+        return { intent: 'create_branch', entities: {}, confidence: 0.8 };
+      }
+      if (lowerQuery.includes('checkout') || lowerQuery.includes('switch')) {
+        return { intent: 'checkout_branch', entities: {}, confidence: 0.8 };
+      }
+      if (lowerQuery.includes('merge')) {
+        return { intent: 'merge_branch', entities: {}, confidence: 0.8 };
+      }
+    }
+    
+    // Status and diff intents - PRIORITIZE these over generic repo operations
+    if (lowerQuery.includes('status') || lowerQuery.includes('what\'s changed') || 
+        lowerQuery.includes('current status') || (lowerQuery.includes('show') && lowerQuery.includes('change'))) {
+      return { intent: 'git_status', entities: {}, confidence: 0.9 };
+    }
+    if (lowerQuery.includes('diff') || lowerQuery.includes('difference') || lowerQuery.includes('differences')) {
+      return { intent: 'git_diff', entities: {}, confidence: 0.9 };
+    }
+    if (lowerQuery.includes('log') || lowerQuery.includes('history') || lowerQuery.includes('commits')) {
+      return { intent: 'git_log', entities: {}, confidence: 0.8 };
+    }
+    
+    // Git operations - PRIORITIZE these over generic repo operations
+    if (lowerQuery.includes('push')) {
+      return { intent: 'push_changes', entities: { branch: 'current', remote: 'origin' }, confidence: 0.9 };
+    }
+    if (lowerQuery.includes('pull') || lowerQuery.includes('sync')) {
+      return { intent: 'pull_changes', entities: { remote: 'origin' }, confidence: 0.9 };
+    }
+    if (lowerQuery.includes('commit')) {
+      return { intent: 'git_commit', entities: {}, confidence: 0.8 };
+    }
+    if (lowerQuery.includes('add') || lowerQuery.includes('stage')) {
+      return { intent: 'git_add', entities: {}, confidence: 0.8 };
+    }
+    if (lowerQuery.includes('revert')) {
+      return { intent: 'revert_commit', entities: {}, confidence: 0.8 };
+    }
+    
+    // Pull request intents
+    if (lowerQuery.includes('pr') || lowerQuery.includes('pull request') || lowerQuery.includes('merge request')) {
+      return { intent: 'create_pr', entities: {}, confidence: 0.9 };
+    }
+    
+    // Help and authentication intents
+    if (lowerQuery.includes('help') || lowerQuery.includes('what can') || lowerQuery.includes('capabilities')) {
+      return { intent: 'help', entities: {}, confidence: 0.9 };
+    }
+    if (lowerQuery.includes('login') || lowerQuery.includes('authenticate') || lowerQuery.includes('logged in')) {
+      return { intent: 'greeting', entities: {}, confidence: 0.8 };
+    }
+    
+    // Greeting intents
+    if (lowerQuery.includes('hello') || lowerQuery.includes('hi') || lowerQuery.includes('hey')) {
+      return { intent: 'greeting', entities: {}, confidence: 0.9 };
+    }
+    
+    return { intent: 'unknown', entities: { error: 'Could not determine intent' }, confidence: 0.0 };
   },
 
   async handleUserQuery(query, username = null) {
