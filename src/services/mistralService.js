@@ -335,10 +335,28 @@ Respond with JSON only:`;
       if (lowerQuery.includes('push') || lowerQuery.includes('commit') || 
           lowerQuery.includes('branch') || lowerQuery.includes('merge') ||
           lowerQuery.includes('pull') || lowerQuery.includes('repo')) {
+        
+        // Extract branch name from query
+        let branchName = 'current';
+        const branchCalledMatch = naturalLanguageQuery.match(/branch\s+called\s+['"]?([^'"\s]+)['"]?/i);
+        if (branchCalledMatch) {
+          branchName = branchCalledMatch[1];
+        } else {
+          const toBranchMatch = naturalLanguageQuery.match(/to\s+['"]?([^'"\s]+)\s+branch/i);
+          if (toBranchMatch) {
+            branchName = toBranchMatch[1];
+          } else {
+            const pushToMatch = naturalLanguageQuery.match(/push\s+to\s+['"]?([^'"\s]+)['"]?/i);
+            if (pushToMatch) {
+              branchName = pushToMatch[1];
+            }
+          }
+        }
+        
         return {
           intent: 'push_changes',
           entities: {
-            branch: 'current',
+            branch: branchName,
             error: 'fallback_parsing',
             original_query: naturalLanguageQuery
           }

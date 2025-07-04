@@ -372,6 +372,12 @@ CRITICAL RULES:
 13. "Clone" should be clone_repo
 14. "Delete" should be unknown (not implemented)
 
+BRANCH NAME EXTRACTION:
+- Extract branch names from phrases like "to branch called X", "to X branch", "on branch X", "push to X"
+- For push_changes: if a specific branch is mentioned, include it in entities.branch
+- For create_branch: if a branch name is mentioned, include it in entities.branch
+- For checkout_branch: if a branch name is mentioned, include it in entities.branch
+
 Available intents: list_repos, list_branches, git_status, git_diff, git_log, push_changes, pull_changes, git_commit, git_add, create_branch, checkout_branch, merge_branch, clone_repo, create_repo, create_pr, revert_commit, greeting, thanks, unrelated, help, error, unknown
 
 EXACT MAPPINGS:
@@ -417,6 +423,12 @@ EXACT MAPPINGS:
 - "authenticate" → greeting
 - "help" → help
 - "what can you do" → help
+
+BRANCH EXAMPLES:
+- "push to branch called feature-update" → {"intent": "push_changes", "entities": {"branch": "feature-update"}}
+- "push to main branch" → {"intent": "push_changes", "entities": {"branch": "main"}}
+- "create a new branch called feature-x" → {"intent": "create_branch", "entities": {"branch": "feature-x"}}
+- "switch to develop branch" → {"intent": "checkout_branch", "entities": {"branch": "develop"}}
 
 IMPORTANT: Only use create_repo when explicitly creating a new repository. For listing, showing, or managing existing repositories, use list_repos.
 
@@ -797,6 +809,24 @@ JSON response:`;
   fallbackIntentDetection(query) {
     const lowerQuery = query.toLowerCase().trim();
     
+    // Helper function to extract branch name
+    const extractBranchName = (query) => {
+      // Look for patterns like "branch called X", "to X branch", "on branch X", "push to X"
+      const branchCalledMatch = query.match(/branch\s+called\s+['"]?([^'"\s]+)['"]?/i);
+      if (branchCalledMatch) return branchCalledMatch[1];
+      
+      const toBranchMatch = query.match(/to\s+['"]?([^'"\s]+)\s+branch/i);
+      if (toBranchMatch) return toBranchMatch[1];
+      
+      const onBranchMatch = query.match(/on\s+branch\s+['"]?([^'"\s]+)['"]?/i);
+      if (onBranchMatch) return onBranchMatch[1];
+      
+      const pushToMatch = query.match(/push\s+to\s+['"]?([^'"\s]+)['"]?/i);
+      if (pushToMatch) return pushToMatch[1];
+      
+      return null;
+    };
+    
     // Repository-related intents - PRIORITIZE list over create
     if (lowerQuery.includes('repo') || lowerQuery.includes('repository')) {
       if (lowerQuery.includes('list') || lowerQuery.includes('show') || lowerQuery.includes('display') || 
@@ -817,10 +847,20 @@ JSON response:`;
         return { intent: 'list_branches', entities: {}, confidence: 0.9 };
       }
       if (lowerQuery.includes('create') || lowerQuery.includes('new')) {
-        return { intent: 'create_branch', entities: {}, confidence: 0.8 };
+        const branchName = extractBranchName(query);
+        return { 
+          intent: 'create_branch', 
+          entities: branchName ? { branch: branchName } : {}, 
+          confidence: 0.8 
+        };
       }
       if (lowerQuery.includes('checkout') || lowerQuery.includes('switch')) {
-        return { intent: 'checkout_branch', entities: {}, confidence: 0.8 };
+        const branchName = extractBranchName(query);
+        return { 
+          intent: 'checkout_branch', 
+          entities: branchName ? { branch: branchName } : {}, 
+          confidence: 0.8 
+        };
       }
       if (lowerQuery.includes('merge')) {
         return { intent: 'merge_branch', entities: {}, confidence: 0.8 };
@@ -841,7 +881,15 @@ JSON response:`;
     
     // Git operations - PRIORITIZE these over generic repo operations
     if (lowerQuery.includes('push')) {
-      return { intent: 'push_changes', entities: { branch: 'current', remote: 'origin' }, confidence: 0.9 };
+      const branchName = extractBranchName(query);
+      return { 
+        intent: 'push_changes', 
+        entities: { 
+          branch: branchName || 'current', 
+          remote: 'origin' 
+        }, 
+        confidence: 0.9 
+      };
     }
     if (lowerQuery.includes('pull') || lowerQuery.includes('sync')) {
       return { intent: 'pull_changes', entities: { remote: 'origin' }, confidence: 0.9 };

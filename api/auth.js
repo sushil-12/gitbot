@@ -426,6 +426,24 @@ let providerFailures = new Map(); // Track failures per provider
 function getFallbackIntent(query) {
   const lowerQuery = query.toLowerCase().trim();
   
+  // Helper function to extract branch name
+  const extractBranchName = (query) => {
+    // Look for patterns like "branch called X", "to X branch", "on branch X", "push to X"
+    const branchCalledMatch = query.match(/branch\s+called\s+['"]?([^'"\s]+)['"]?/i);
+    if (branchCalledMatch) return branchCalledMatch[1];
+    
+    const toBranchMatch = query.match(/to\s+['"]?([^'"\s]+)\s+branch/i);
+    if (toBranchMatch) return toBranchMatch[1];
+    
+    const onBranchMatch = query.match(/on\s+branch\s+['"]?([^'"\s]+)['"]?/i);
+    if (onBranchMatch) return onBranchMatch[1];
+    
+    const pushToMatch = query.match(/push\s+to\s+['"]?([^'"\s]+)['"]?/i);
+    if (pushToMatch) return pushToMatch[1];
+    
+    return null;
+  };
+  
   // Repository-related intents - PRIORITIZE list over create
   if (lowerQuery.includes('repo') || lowerQuery.includes('repository')) {
     if (lowerQuery.includes('list') || lowerQuery.includes('show') || lowerQuery.includes('display') || 
@@ -446,10 +464,20 @@ function getFallbackIntent(query) {
       return { intent: 'list_branches', entities: {}, confidence: 0.9 };
     }
     if (lowerQuery.includes('create') || lowerQuery.includes('new')) {
-      return { intent: 'create_branch', entities: {}, confidence: 0.8 };
+      const branchName = extractBranchName(query);
+      return { 
+        intent: 'create_branch', 
+        entities: branchName ? { branch: branchName } : {}, 
+        confidence: 0.8 
+      };
     }
     if (lowerQuery.includes('checkout') || lowerQuery.includes('switch')) {
-      return { intent: 'checkout_branch', entities: {}, confidence: 0.8 };
+      const branchName = extractBranchName(query);
+      return { 
+        intent: 'checkout_branch', 
+        entities: branchName ? { branch: branchName } : {}, 
+        confidence: 0.8 
+      };
     }
     if (lowerQuery.includes('merge')) {
       return { intent: 'merge_branch', entities: {}, confidence: 0.8 };
@@ -470,7 +498,15 @@ function getFallbackIntent(query) {
   
   // Git operations - PRIORITIZE these over generic repo operations
   if (lowerQuery.includes('push')) {
-    return { intent: 'push_changes', entities: { branch: 'current', remote: 'origin' }, confidence: 0.9 };
+    const branchName = extractBranchName(query);
+    return { 
+      intent: 'push_changes', 
+      entities: { 
+        branch: branchName || 'current', 
+        remote: 'origin' 
+      }, 
+      confidence: 0.9 
+    };
   }
   if (lowerQuery.includes('pull') || lowerQuery.includes('sync')) {
     return { intent: 'pull_changes', entities: { remote: 'origin' }, confidence: 0.9 };
